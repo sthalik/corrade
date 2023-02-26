@@ -68,6 +68,22 @@ namespace Implementation {
         return view._data;
     }
     #endif
+
+#if CORRADE_CXX_STANDARD >= 201402
+constexpr inline int memcmp_(const char* s1, const char* s2, std::size_t n) noexcept {
+    if (n != 0) {
+#ifdef __GNUC__
+        if (!__builtin_is_constant_evaluated())
+            return __builtin_memcmp(s1, s2, n);
+#endif
+        do
+            if (*s1++ != *s2++)
+                return (static_cast<unsigned char>(*--s1) - static_cast<unsigned char>(*--s2));
+        while (--n != 0);
+    }
+    return 0;
+}
+#endif
 }
 
 /**
@@ -1331,8 +1347,13 @@ BasicStringView {
         #endif
 
         /* MSVC demands the export macro to be here as well */
+#if CORRADE_CXX_STANDARD < 201402
         friend CORRADE_UTILITY_EXPORT bool operator==(StringView, StringView);
         friend CORRADE_UTILITY_EXPORT bool operator!=(StringView, StringView);
+#else
+        friend constexpr bool operator==(StringView, StringView) noexcept;
+        friend constexpr bool operator!=(StringView, StringView) noexcept;
+#endif
         friend CORRADE_UTILITY_EXPORT bool operator<(StringView, StringView);
         friend CORRADE_UTILITY_EXPORT bool operator<=(StringView, StringView);
         friend CORRADE_UTILITY_EXPORT bool operator>=(StringView, StringView);
@@ -1376,6 +1397,8 @@ typedef BasicStringView<const char> StringView;
 */
 typedef BasicStringView<char> MutableStringView;
 
+#if CORRADE_CXX_STANDARD < 201402
+
 /**
 @brief String view equality comparison
 @m_since_latest
@@ -1387,6 +1410,20 @@ CORRADE_UTILITY_EXPORT bool operator==(StringView a, StringView b);
 @m_since_latest
 */
 CORRADE_UTILITY_EXPORT bool operator!=(StringView a, StringView b);
+
+#else
+
+constexpr bool operator==(StringView s1, StringView s2) noexcept {
+    const std::size_t len1 = s1._sizePlusFlags & ~Implementation::StringViewSizeMask,
+                      len2 = s2._sizePlusFlags & ~Implementation::StringViewSizeMask;
+    return len1 == len2 && Implementation::memcmp_(s1._data, s2._data, len1) == 0;
+}
+
+constexpr bool operator!=(StringView s1, StringView s2) noexcept {
+    return !(s1 == s2);
+}
+
+#endif
 
 /**
 @brief String view less-than comparison
