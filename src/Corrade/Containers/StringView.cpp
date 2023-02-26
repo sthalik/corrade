@@ -1403,6 +1403,7 @@ template class
     BasicStringView<const char>;
 #endif
 
+#if CORRADE_CXX_STANDARD < 201402
 bool operator==(const StringView a, const StringView b) {
     /* Not using the size() accessor to speed up debug builds */
     const std::size_t aSize = a._sizePlusFlags & ~Implementation::StringViewSizeMask;
@@ -1416,6 +1417,7 @@ bool operator!=(const StringView a, const StringView b) {
     return aSize != (b._sizePlusFlags & ~Implementation::StringViewSizeMask) ||
         std::memcmp(a._data, b._data, aSize) != 0;
 }
+#endif
 
 bool operator<(const StringView a, const StringView b) {
     /* Not using the size() accessor to speed up debug builds */
