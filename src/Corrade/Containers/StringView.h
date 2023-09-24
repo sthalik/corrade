@@ -1160,7 +1160,7 @@ BasicStringView {
          * substrings.
          * @see @ref findLastOr(), @ref findAnyOr()
          */
-        BasicStringView<T> findOr(StringView substring, T* fail) const;
+        inline BasicStringView<T> findOr(StringView substring, T* fail) const;
 
         /**
          * @brief Find a character with a custom failure pointer
@@ -1169,7 +1169,7 @@ BasicStringView {
          * one byte.
          * @see @ref find(char) const, @ref findLastOr(char, T*) const
          */
-        BasicStringView<T> findOr(char character, T* fail) const;
+        inline BasicStringView<T> findOr(char character, T* fail) const;
 
         /**
          * @brief Find the last occurence of a substring
@@ -1287,7 +1287,7 @@ BasicStringView {
          *
          * @see @ref findLastAnyOr(), @ref findOr()
          */
-        BasicStringView<T> findAnyOr(StringView characters, T* fail) const;
+        inline BasicStringView<T> findAnyOr(StringView characters, T* fail) const;
 
         /**
          * @brief Find the last occurence of any character from given set
@@ -1317,7 +1317,7 @@ BasicStringView {
          * wasn't found. See @ref findAnyOr() for an example use case.
          * @see @ref findLastOr()
          */
-        BasicStringView<T> findLastAnyOr(StringView characters, T* fail) const;
+        inline BasicStringView<T> findLastAnyOr(StringView characters, T* fail) const;
 
         /**
          * @brief Whether the view contains any character from given set
@@ -1326,7 +1326,7 @@ BasicStringView {
          * want to know if a character was found or not.
          * @see @ref contains()
          */
-        bool containsAny(StringView substring) const;
+        inline bool containsAny(StringView substring) const;
 
         /**
          * @brief Count of occurences of given character
