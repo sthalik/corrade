@@ -445,6 +445,13 @@ that make use of C++14 constexpr.
 #endif
 #endif
 
+#if defined(__clang__) && __clang_major__ >= 9 || defined(__GNUG__) && __GNUG__ >= 9 || defined(_MSC_VER) && _MSC_VER >= 1931
+#define CORRADE_CONSTEVAL (__builtin_is_constant_evaluated())
+#elif CORRADE_CXX_STANDARD >= 202002L
+#define CORRADE_CONSTEVAL (std::is_constant_evaluated())
+#define CORRADE_CONSTEVAL_NEEDS_TYPE_TRAITS
+#endif
+
 /** @hideinitializer
 @brief C++20 constexpr
 @m_since_latest
