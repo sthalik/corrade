@@ -250,6 +250,17 @@ that make use of C++14 constexpr.
 #endif
 #endif
 
+/* GCC 9, Clang 9 and Apple Clang 11.0.3 added the builtin. Apple Clang 11.0.0 lacks it, hence 12. */
+#if (defined(CORRADE_TARGET_GCC) && !defined(CORRADE_TARGET_CLANG) && __GNUC__ >= 9) || \
+    (defined(CORRADE_TARGET_CLANG) && !defined(CORRADE_TARGET_APPLE_CLANG) && __clang_major__ >= 9) || \
+    (defined(CORRADE_TARGET_APPLE_CLANG) && __clang_major__ >= 12) || \
+    (defined(_MSC_VER) && _MSC_VER >= 1931)
+#define CORRADE_CONSTEVAL (__builtin_is_constant_evaluated())
+#elif CORRADE_CXX_STANDARD >= 202002L
+#define CORRADE_CONSTEVAL (std::is_constant_evaluated())
+#define CORRADE_CONSTEVAL_NEEDS_TYPE_TRAITS
+#endif
+
 /** @hideinitializer
 @brief C++20 constexpr
 @m_since_latest
