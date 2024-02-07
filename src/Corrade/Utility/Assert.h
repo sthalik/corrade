@@ -172,6 +172,14 @@ You can override this implementation by placing your own
     @ref CORRADE_INTERNAL_ASSERT(), @ref CORRADE_ASSUME()
 */
 #ifndef CORRADE_ASSERT
+
+#if defined CORRADE_TARGET_WINDOWS && !defined CORRADE_TARGET_MSVC
+#define CORRADE_ASSERT_MAYBE_SIGSEGV() \
+    do { *reinterpret_cast<volatile char*>(-1) = 0; } while (false)
+#else
+#define CORRADE_ASSERT_MAYBE_SIGSEGV() void(0)
+#endif
+
 #if defined(CORRADE_NO_ASSERT) || (defined(CORRADE_STANDARD_ASSERT) && defined(NDEBUG))
 #define CORRADE_ASSERT(condition, message, returnValue) do {} while(false)
 #elif defined(CORRADE_STANDARD_ASSERT)
@@ -181,7 +189,10 @@ You can override this implementation by placing your own
     do {                                                                    \
         if(!(condition)) {                                                  \
             Corrade::Utility::Error{} << message;                           \
-            if(Corrade::Utility::Error::defaultOutput() == Corrade::Utility::Error::output()) std::abort(); \
+            if(Corrade::Utility::Error::defaultOutput() == Corrade::Utility::Error::output()) { \
+                CORRADE_ASSERT_MAYBE_SIGSEGV();                             \
+                std::abort();                                               \
+            }                                                               \
             return returnValue;                                             \
         }                                                                   \
     } while(false)
@@ -190,6 +201,7 @@ You can override this implementation by placing your own
     do {                                                                    \
         if(!(condition)) {                                                  \
             Corrade::Utility::Error{Corrade::Utility::Error::defaultOutput()} << message; \
+            CORRADE_ASSERT_MAYBE_SIGSEGV();                                 \
             std::abort();                                                   \
             return returnValue;                                             \
         }                                                                   \
