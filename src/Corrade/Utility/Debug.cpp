@@ -513,7 +513,7 @@ void Debug::cleanupOnDestruction() {
 
     /* Newline at the end */
     if(_output && (_flags & InternalFlag::ValueWritten) && !(_flags & InternalFlag::NoNewlineAtTheEnd))
-        *_output << std::endl;
+        *_output << "\n";
 
     /* Reset previous global output */
     debugGlobals.output = _previousGlobalOutput;
