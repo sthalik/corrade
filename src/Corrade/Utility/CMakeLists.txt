@@ -234,7 +234,7 @@ if(CORRADE_WITH_UTILITY)
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR (CMAKE_CXX_COMPILER_ID MATCHES "(Apple)?Clang" AND NOT CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC") OR CORRADE_TARGET_EMSCRIPTEN)
         # INTERFACE, not PUBLIC, to verify we're still correctly enabling it in
         # UseCorrade as well
-        target_compile_options(CorradeUtility INTERFACE -fno-strict-aliasing)
+        #target_compile_options(CorradeUtility INTERFACE -fno-strict-aliasing)
     endif()
     if(CORRADE_TARGET_EMSCRIPTEN)
         # TODO switch to target_link_options() and SHELL: once we require CMake

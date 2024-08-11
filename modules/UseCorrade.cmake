@@ -132,7 +132,7 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR (CMAKE_CXX_COMPILER_ID MATCHES "(Appl
         # it and I don't need to deal with insane bugs and random breakages. On
         # the other hand it's set here as well so even internal test code (that
         # doesn't necessarily link to CorradeUtility) gets it implicitly too.
-        "-fno-strict-aliasing")
+        ) #"-fno-strict-aliasing")
 
     # Some flags are not yet supported everywhere
     # TODO: do this with check_c_compiler_flags()
