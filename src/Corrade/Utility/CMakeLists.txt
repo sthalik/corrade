@@ -44,6 +44,7 @@ endif()
 
 if(CORRADE_WITH_UTILITY)
     set(CorradeUtility_SRCS
+        Assert.cpp
         Debug.cpp
         ConfigurationValue.cpp
         MurmurHash2.cpp
@@ -93,6 +94,7 @@ if(CORRADE_WITH_UTILITY)
         Debug.h
         DebugAssert.h
         DebugStl.h
+        DebugStream.h
         DebugStlStringView.h
         Endianness.h
         EndiannessBatch.h

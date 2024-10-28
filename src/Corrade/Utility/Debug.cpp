@@ -25,6 +25,7 @@
 */
 
 #include "Debug.h"
+#include "DebugStream.h"
 
 #include <cstdlib>
 #include <cstdint>
@@ -79,24 +80,24 @@ namespace Corrade { namespace Utility {
 
 namespace {
 
-template<class T> inline void toStream(std::ostream& s, const T& value) {
-    s << value;
+template<class T> inline void toStream(DebugStream s, const T& value) {
+    *DebugStream::ostream(s) << value;
 }
 
-template<> inline void toStream(std::ostream& s, const Containers::StringView& value) {
-    s.write(value.data(), value.size());
+template<> inline void toStream(DebugStream s, const Containers::StringView& value) {
+    DebugStream::ostream(s)->write(value.data(), value.size());
 }
 
-template<> inline void toStream(std::ostream& s, const Containers::MutableStringView& value) {
-    s.write(value.data(), value.size());
+template<> inline void toStream(DebugStream s, const Containers::MutableStringView& value) {
+    DebugStream::ostream(s)->write(value.data(), value.size());
 }
 
-template<> inline void toStream(std::ostream& s, const Containers::String& value) {
-    s.write(value.data(), value.size());
+template<> inline void toStream(DebugStream s, const Containers::String& value) {
+    DebugStream::ostream(s)->write(value.data(), value.size());
 }
 
-template<> inline void toStream<Implementation::DebugOstreamFallback>(std::ostream& s, const Implementation::DebugOstreamFallback& value) {
-    value.apply(s);
+template<> inline void toStream<Implementation::DebugOstreamFallback>(DebugStream s, const Implementation::DebugOstreamFallback& value) {
+    value.apply(*DebugStream::ostream(s));
 }
 
 #if defined(CORRADE_TARGET_WINDOWS) && !defined(CORRADE_UTILITY_USE_ANSI_COLORS)
@@ -149,7 +150,7 @@ namespace {
 #endif
 
 struct DebugGlobals {
-    std::ostream *output, *warningOutput, *errorOutput;
+    Debug::StreamFwd *output, *warningOutput, *errorOutput;
     #if !defined(CORRADE_TARGET_WINDOWS) ||defined(CORRADE_UTILITY_USE_ANSI_COLORS)
     Debug::Color color;
     bool colorBold, colorInverted;
@@ -243,11 +244,11 @@ template<Debug::Color c, bool bold> Debug::Modifier Debug::colorInternal() {
             /* Adds an extra reset to also undo the inverse, if was set
                before */
             constexpr const char code[]{'\033', '[', '0', ';', '1' , ';', '3', '0' + char(c), 'm', '\0'};
-            *debug._output << code;
+            *DebugStream::ostream(debug._output) << code;
         } else {
             /* This resets both bold and inverse */
             constexpr const char code[]{'\033', '[', '0', ';', '3', '0' + char(c), 'm', '\0'};
-            *debug._output << code;
+            *DebugStream::ostream(debug._output) << code;
         }
         #endif
     };
@@ -264,7 +265,7 @@ template<Debug::Color c> Debug::Modifier Debug::invertedColorInternal() {
         debugGlobals.colorInverted = true;
         /* Adds an extra reset to also undo the bold, if was set before */
         constexpr const char code[] = { '\033', '[', '0', ';', '7', ';', '3', '0' + char(c), 'm', '\0' };
-        *debug._output << code;
+        *DebugStream::ostream(debug._output) << code;
     };
 }
 #endif
@@ -283,11 +284,11 @@ inline void Debug::resetColorInternal() {
         /* Only one of the two should be set by our code */
         CORRADE_INTERNAL_ASSERT(!_previousColorBold || !_previousColorInverted);
         const char code[]{'\033', '[', '0', ';', _previousColorBold ? '1' : '7', ';', '3', char('0' + char(_previousColor)), 'm', '\0'};
-        *_output << code;
+        *DebugStream::ostream(_output) << code;
     } else if(_previousColor != Color::Default) {
         const char code[]{'\033', '[', '0', ';', '3', char('0' + char(_previousColor)), 'm', '\0'};
-        *_output << code;
-    } else *_output << "\033[0m";
+        *DebugStream::ostream(_output) << code;
+    } else *DebugStream::ostream(_output) << "\033[0m";
 
     debugGlobals.color = _previousColor;
     debugGlobals.colorBold = _previousColorBold;
@@ -387,15 +388,15 @@ void Debug::setImmediateFlags(Flags flags) {
     _immediateFlags = InternalFlag(static_cast<unsigned short>(flags));
 }
 
-std::ostream* Debug::defaultOutput() { return &std::cout; }
-std::ostream* Warning::defaultOutput() { return &std::cerr; }
-std::ostream* Error::defaultOutput() { return &std::cerr; }
+DebugStream Debug::defaultOutput() { return DebugStream::fwd(&std::cout); }
+DebugStream Warning::defaultOutput() { return DebugStream::fwd(&std::cerr); }
+DebugStream Error::defaultOutput() { return DebugStream::fwd(&std::cerr); }
 
-std::ostream* Debug::output() { return debugGlobals.output; }
-std::ostream* Warning::output() { return debugGlobals.warningOutput; }
-std::ostream* Error::output() { return debugGlobals.errorOutput; }
+DebugStream Debug::output() { return debugGlobals.output; }
+DebugStream Warning::output() { return debugGlobals.warningOutput; }
+DebugStream Error::output() { return debugGlobals.errorOutput; }
 
-bool Debug::isTty(std::ostream* const output) {
+bool Debug::isTty(DebugStream output) {
     /* On Windows with WINAPI colors check the stream output handle */
     #if defined(CORRADE_TARGET_WINDOWS) && !defined(CORRADE_UTILITY_USE_ANSI_COLORS)
     return streamOutputHandle(output) != INVALID_HANDLE_VALUE;
@@ -414,8 +415,8 @@ bool Debug::isTty(std::ostream* const output) {
         #pragma warning(push)
         #pragma warning(disable: 4996)
         #endif
-        ((output == &std::cout && isatty(1)) ||
-         (output == &std::cerr && isatty(2)))
+        ((DebugStream::ostream(output) == &std::cout && isatty(1)) ||
+         (DebugStream::ostream(output) == &std::cerr && isatty(2)))
         #ifdef CORRADE_TARGET_CLANG_CL
         #pragma clang diagnostic pop
         #elif defined(CORRADE_TARGET_MSVC)
@@ -452,7 +453,7 @@ bool Debug::isTty() { return isTty(debugGlobals.output); }
 bool Warning::isTty() { return Debug::isTty(debugGlobals.warningOutput); }
 bool Error::isTty() { return Debug::isTty(debugGlobals.errorOutput); }
 
-Debug::Debug(std::ostream* const output, const Flags flags): _flags{InternalFlag(static_cast<unsigned short>(flags))}, _immediateFlags{InternalFlag::NoSpace} {
+Debug::Debug(DebugStream const output, const Flags flags): _flags{InternalFlag(static_cast<unsigned short>(flags))}, _immediateFlags{InternalFlag::NoSpace} {
     /* Save previous global output and replace it with current one */
     _previousGlobalOutput = debugGlobals.output;
     debugGlobals.output = _output = output;
@@ -481,13 +482,13 @@ DebugSourceLocation::DebugSourceLocation(Debug&& debug, const char* file, int li
 }
 #endif
 
-Warning::Warning(std::ostream* const output, const Flags flags): Debug{flags} {
+Warning::Warning(DebugStream const output, const Flags flags): Debug{flags} {
     /* Save previous global output and replace it with current one */
     _previousGlobalWarningOutput = debugGlobals.warningOutput;
     debugGlobals.warningOutput = _output = output;
 }
 
-Error::Error(std::ostream* const output, const Flags flags): Debug{flags} {
+Error::Error(DebugStream const output, const Flags flags): Debug{flags} {
     /* Save previous global output and replace it with current one */
     _previousGlobalErrorOutput = debugGlobals.errorOutput;
     debugGlobals.errorOutput = _output = output;
@@ -503,7 +504,7 @@ void Debug::cleanupOnDestruction() {
        !Debug{}; will print just that, while Debug{}; is a no-op */
     if(_output && _sourceLocationFile) {
         CORRADE_INTERNAL_ASSERT(_immediateFlags & InternalFlag::NoSpace);
-        *_output << _sourceLocationFile << ":" << _sourceLocationLine;
+        *DebugStream::ostream(_output) << _sourceLocationFile << ":" << _sourceLocationLine;
         _flags |= InternalFlag::ValueWritten;
     }
     #endif
@@ -513,7 +514,7 @@ void Debug::cleanupOnDestruction() {
 
     /* Newline at the end */
     if(_output && (_flags & InternalFlag::ValueWritten) && !(_flags & InternalFlag::NoNewlineAtTheEnd))
-        *_output << "\n";
+        *DebugStream::ostream(_output) << "\n";
 
     /* Reset previous global output */
     debugGlobals.output = _previousGlobalOutput;
@@ -534,6 +535,9 @@ void Error::cleanupOnDestruction() {
 Error::~Error() {
     cleanupOnDestruction();
 }
+
+Fatal::Fatal(DebugStream output, int exitCode, Flags flags): Error{output, flags}, _exitCode{exitCode} {}
+Fatal::Fatal(DebugStream output, Flags flags): Fatal{output, 1, flags} {}
 
 /* MSVC in a Release build complains that "destructor never returns, potential
    memory leak". Well, yes, since this is a [[noreturn]] function. */
@@ -560,25 +564,25 @@ template<class T> Debug& Debug::print(const T& value) {
     /* Print source location, if not printed yet */
     if(_sourceLocationFile) {
         CORRADE_INTERNAL_ASSERT(_immediateFlags & InternalFlag::NoSpace);
-        *_output << _sourceLocationFile << ":" << _sourceLocationLine << ": ";
+        *DebugStream::ostream(_output) << _sourceLocationFile << ":" << _sourceLocationLine << ": ";
         _sourceLocationFile = nullptr;
     }
     #endif
 
     /* Separate values with spaces if enabled */
     if(!((_immediateFlags|_flags) & InternalFlag::NoSpace))
-        *_output << ' ';
+        *DebugStream::ostream(_output) << ' ';
     /* Print the next value as hexadecimal if enabled */
     /** @todo this does strange crap for negative values (printing them as
         unsigned), revisit once iostreams are not used anymore */
     if(((_immediateFlags|_flags) & InternalFlag::Hex) && std::is_integral<T>::value)
-        *_output << "0x" << std::hex;
+        *DebugStream::ostream(_output) << "0x" << std::hex;
 
-    toStream(*_output, value);
+    toStream(_output, value);
 
     /* Reset the hexadecimal printing back if it was enabled */
     if(((_immediateFlags|_flags) & InternalFlag::Hex) && std::is_integral<T>::value)
-        *_output << std::dec;
+        *DebugStream::ostream(_output) << std::dec;
 
     /* Reset all internal flags after */
     _immediateFlags = {};
@@ -646,17 +650,17 @@ Debug& Debug::operator<<(unsigned long long value) { return print(value); }
 
 Debug& Debug::operator<<(float value) {
     if(!_output) return *this;
-    *_output << std::setprecision(Implementation::FloatPrecision<float>::Digits);
+    *DebugStream::ostream(_output) << std::setprecision(Implementation::FloatPrecision<float>::Digits);
     return print(value);
 }
 Debug& Debug::operator<<(double value) {
     if(!_output) return *this;
-    *_output << std::setprecision(Implementation::FloatPrecision<double>::Digits);
+    *DebugStream::ostream(_output) << std::setprecision(Implementation::FloatPrecision<double>::Digits);
     return print(value);
 }
 Debug& Debug::operator<<(long double value) {
     if(!_output) return *this;
-    *_output << std::setprecision(Implementation::FloatPrecision<long double>::Digits);
+    *DebugStream::ostream(_output) << std::setprecision(Implementation::FloatPrecision<long double>::Digits);
     return print(value);
 }
 

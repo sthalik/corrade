@@ -200,7 +200,7 @@ You can override this implementation by placing your own
 #define CORRADE_ASSERT(condition, message, returnValue)                     \
     do {                                                                    \
         if(!(condition)) {                                                  \
-            Corrade::Utility::Error{Corrade::Utility::Error::defaultOutput()} << message; \
+            Corrade::Utility::Implementation::errorOutputForAssert() << message; \
             CORRADE_ASSERT_MAYBE_SIGSEGV();                                 \
             std::abort();                                                   \
             return returnValue;                                             \
@@ -260,7 +260,7 @@ You can override this implementation by placing your own
 #else
 #define CORRADE_CONSTEXPR_ASSERT(condition, message)                        \
     static_cast<void>((condition) ? 0 : ([&]() {                            \
-        Corrade::Utility::Error{Corrade::Utility::Error::defaultOutput()} << message; \
+        Corrade::Utility::Implementation::errorOutputForAssert() << message; \
         std::abort();                                                       \
     }(), 0))
 #endif
@@ -306,7 +306,7 @@ You can override this implementation by placing your own
 #define CORRADE_ASSERT_OUTPUT(call, message, returnValue)                   \
     do {                                                                    \
         if(!(call)) {                                                       \
-            Corrade::Utility::Error{Corrade::Utility::Error::defaultOutput()} << message; \
+            Corrade::Utility::Implementation::errorOutputForAssert() << message; \
             std::abort();                                                   \
             return returnValue;                                             \
         }                                                                   \
@@ -363,7 +363,7 @@ You can override this implementation by placing your own
 #else
 #define CORRADE_ASSERT_UNREACHABLE(message, returnValue)                                        \
     do {                                                                    \
-        Corrade::Utility::Error{Corrade::Utility::Error::defaultOutput()} << message; \
+        Corrade::Utility::Implementation::errorOutputForAssert() << message; \
         std::abort();                                                       \
     } while(false)
 #endif
@@ -423,7 +423,7 @@ You can override this implementation by placing your own
 #define CORRADE_INTERNAL_ASSERT(condition)                                  \
     do {                                                                    \
         if(!(condition)) {                                                  \
-            Corrade::Utility::Error{Corrade::Utility::Error::defaultOutput()} << "Assertion " #condition " failed at " __FILE__ ":" CORRADE_LINE_STRING; \
+            Corrade::Utility::Implementation::errorOutputForAssert() << "Assertion " #condition " failed at " __FILE__ ":" CORRADE_LINE_STRING; \
             std::abort();                                                   \
         }                                                                   \
     } while(false)
@@ -465,7 +465,7 @@ You can override this implementation by placing your own
 #else
 #define CORRADE_INTERNAL_CONSTEXPR_ASSERT(condition)                        \
     static_cast<void>((condition) ? 0 : ([&]() {                            \
-        Corrade::Utility::Error{Corrade::Utility::Error::defaultOutput()} << "Assertion " #condition " failed at " __FILE__ ":" CORRADE_LINE_STRING; \
+        Corrade::Utility::Implementation::errorOutputForAssert() << "Assertion " #condition " failed at " __FILE__ ":" CORRADE_LINE_STRING; \
         std::abort();                                                       \
     }(), 0))
 #endif
@@ -500,7 +500,7 @@ You can override this implementation by placing your own
 #define CORRADE_INTERNAL_ASSERT_OUTPUT(call)                                \
     do {                                                                    \
         if(!(call)) {                                                       \
-            Corrade::Utility::Error{Corrade::Utility::Error::defaultOutput()} << "Assertion " #call " failed at " __FILE__ ":" CORRADE_LINE_STRING; \
+            Corrade::Utility::Implementation::errorOutputForAssert() << "Assertion " #call " failed at " __FILE__ ":" CORRADE_LINE_STRING; \
             std::abort();                                                   \
         }                                                                   \
     } while(false)
@@ -509,6 +509,11 @@ You can override this implementation by placing your own
 
 #if !defined(CORRADE_INTERNAL_ASSERT_EXPRESSION) && !defined(CORRADE_NO_ASSERT) && !(defined(CORRADE_STANDARD_ASSERT) && defined(NDEBUG))
 namespace Corrade { namespace Utility { namespace Implementation {
+    Debug& assertExpressionWriteError(const char* message);
+
+    bool isDefaultErrorOutput();
+    Error errorOutputForAssert();
+
     #ifdef CORRADE_STANDARD_ASSERT
     template<class T> T assertExpression(T&& value) {
         assert(value);
@@ -517,7 +522,7 @@ namespace Corrade { namespace Utility { namespace Implementation {
     #else
     template<class T> T assertExpression(T&& value, const char* message) {
         if(!value) {
-            Corrade::Utility::Error{Corrade::Utility::Error::defaultOutput()} << message;
+            assertExpressionWriteError(message);
             std::abort();
         }
 
@@ -616,7 +621,7 @@ You can override this implementation by placing your own
 #else
 #define CORRADE_INTERNAL_ASSERT_UNREACHABLE()                                        \
     do {                                                                    \
-        Corrade::Utility::Error{Corrade::Utility::Error::defaultOutput()} << "Reached unreachable code at " __FILE__ ":" CORRADE_LINE_STRING; \
+        Corrade::Utility::Implementation::errorOutputForAssert() << "Reached unreachable code at " __FILE__ ":" CORRADE_LINE_STRING; \
         std::abort();                                                       \
     } while(false)
 #endif

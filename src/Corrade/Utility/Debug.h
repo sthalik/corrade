@@ -31,7 +31,6 @@
  * @see @ref Corrade/Utility/DebugStl.h
  */
 
-#include <iosfwd>
 #include <type_traits>
 #include <utility> /** @todo consider putting this away as well (900 LOC) */
 
@@ -41,6 +40,8 @@
 #include "Corrade/Utility/visibility.h"
 
 namespace Corrade { namespace Utility {
+
+class DebugStream;
 
 #ifdef CORRADE_BUILD_DEPRECATED
 /**
@@ -261,6 +262,8 @@ class CORRADE_UTILITY_EXPORT Debug {
             /* When adding values, don't forget to adapt InternalFlag as well
                and update PublicFlagMask in Debug.cpp */
         };
+
+        class StreamFwd;
 
         /**
          * @brief Debug output flags
@@ -519,7 +522,7 @@ class CORRADE_UTILITY_EXPORT Debug {
          * @ref std::cout.
          * @see @ref output()
          */
-        static std::ostream* defaultOutput();
+        static DebugStream defaultOutput();
 
         /**
          * @brief Current debug output stream
@@ -528,7 +531,7 @@ class CORRADE_UTILITY_EXPORT Debug {
          * be using this output stream.
          * @see @ref defaultOutput()
          */
-        static std::ostream* output();
+        static DebugStream output();
 
         /**
          * @brief Whether given output stream is a TTY
@@ -550,7 +553,7 @@ class CORRADE_UTILITY_EXPORT Debug {
          *      on @ref CORRADE_TARGET_EMSCRIPTEN "Emscripten" because
          *      @cpp isatty() @ce is not able to detect file redirection.
          */
-        static bool isTty(std::ostream* output);
+        static bool isTty(DebugStream output);
 
         /**
          * @brief Whether current debug output is a TTY
@@ -580,7 +583,7 @@ class CORRADE_UTILITY_EXPORT Debug {
          * during lifetime of this instance will inherit the output set in
          * @p output.
          */
-        explicit Debug(std::ostream* output, Flags flags = {});
+        explicit Debug(DebugStream output, Flags flags = {});
 
         /** @brief Copying is not allowed */
         Debug(const Debug&) = delete;
@@ -789,7 +792,7 @@ class CORRADE_UTILITY_EXPORT Debug {
     #else
     private:
     #endif
-        std::ostream* _output;
+        StreamFwd* _output;
 
         enum class InternalFlag: unsigned short {
             /* Values matching the Flag enum */
@@ -827,7 +830,7 @@ class CORRADE_UTILITY_EXPORT Debug {
 
         CORRADE_UTILITY_LOCAL void resetColorInternal();
 
-        std::ostream* _previousGlobalOutput;
+        StreamFwd* _previousGlobalOutput;
         #if defined(CORRADE_TARGET_WINDOWS) && !defined(CORRADE_UTILITY_USE_ANSI_COLORS)
         unsigned short _previousColorAttributes = 0xffff;
         #else
@@ -994,7 +997,7 @@ class CORRADE_UTILITY_EXPORT Warning: public Debug {
          * @ref std::cerr.
          * @see @ref output()
          */
-        static std::ostream* defaultOutput();
+        static DebugStream defaultOutput();
 
         /**
          * @brief Current warning output stream
@@ -1003,7 +1006,7 @@ class CORRADE_UTILITY_EXPORT Warning: public Debug {
          * will be using this output stream.
          * @see @ref defaultOutput()
          */
-        static std::ostream* output();
+        static DebugStream output();
 
         /**
          * @brief Whether current warning output is a TTY
@@ -1033,7 +1036,7 @@ class CORRADE_UTILITY_EXPORT Warning: public Debug {
          * constructor during lifetime of this instance will inherit the output
          * set in @p output.
          */
-        explicit Warning(std::ostream* output, Flags flags = {});
+        explicit Warning(DebugStream output, Flags flags = {});
 
         /** @brief Copying is not allowed */
         Warning(const Warning&) = delete;
@@ -1058,7 +1061,7 @@ class CORRADE_UTILITY_EXPORT Warning: public Debug {
         Warning& operator=(Warning&&) = delete;
 
     private:
-        std::ostream* _previousGlobalWarningOutput;
+        StreamFwd* _previousGlobalWarningOutput;
 };
 
 /**
@@ -1081,7 +1084,7 @@ class CORRADE_UTILITY_EXPORT Error: public Debug {
          * @ref std::cerr.
          * @see @ref output()
          */
-        static std::ostream* defaultOutput();
+        static DebugStream defaultOutput();
 
         /**
          * @brief Current error output stream
@@ -1090,7 +1093,7 @@ class CORRADE_UTILITY_EXPORT Error: public Debug {
          * will be using this output stream.
          * @see @ref defaultOutput()
          */
-        static std::ostream* output();
+        static DebugStream output();
 
         /**
          * @brief Whether current error output stream is a TTY
@@ -1120,7 +1123,7 @@ class CORRADE_UTILITY_EXPORT Error: public Debug {
          * constructor during lifetime of this instance will inherit the output
          * set in @p output.
          */
-        explicit Error(std::ostream* output, Flags flags = {});
+        explicit Error(DebugStream output, Flags flags = {});
 
         /** @brief Copying is not allowed */
         Error(const Error&) = delete;
@@ -1152,7 +1155,7 @@ class CORRADE_UTILITY_EXPORT Error: public Debug {
         CORRADE_UTILITY_LOCAL void cleanupOnDestruction(); /* Needed for Fatal */
 
     private:
-        std::ostream* _previousGlobalErrorOutput;
+        StreamFwd* _previousGlobalErrorOutput;
 };
 
 /**
@@ -1189,10 +1192,10 @@ class CORRADE_UTILITY_EXPORT Fatal: public Error {
          * @param exitCode      Application exit code to be used on destruction
          * @param flags         Output flags
          */
-        Fatal(std::ostream* output, int exitCode = 1, Flags flags = {}): Error{output, flags}, _exitCode{exitCode} {}
+        Fatal(DebugStream output, int exitCode = 1, Flags flags = {});
 
         /** @overload */
-        Fatal(std::ostream* output, Flags flags = {}): Fatal{output, 1, flags} {}
+        Fatal(DebugStream output, Flags flags = {});
 
         /**
          * @brief Destructor

@@ -43,6 +43,7 @@
 #include "Corrade/TestSuite/Implementation/BenchmarkCounters.h"
 #include "Corrade/TestSuite/Implementation/BenchmarkStats.h"
 #include "Corrade/Utility/Arguments.h"
+#include "Corrade/Utility/DebugStream.h"
 #include "Corrade/Utility/Format.h"
 #include "Corrade/Utility/Math.h"
 #include "Corrade/Utility/Path.h"
@@ -55,6 +56,7 @@
 namespace Corrade { namespace TestSuite {
 
 using namespace Containers::Literals;
+using Utility::DebugStream;
 
 namespace {
     inline int digitCount(int number) {
@@ -237,7 +239,7 @@ Tester& Tester::instance() {
 
 int Tester::exec() { return exec(nullptr, &std::cout, &std::cerr); }
 
-int Tester::exec(Tester* const previousTester, std::ostream* const logOutput, std::ostream* const errorOutput) {
+int Tester::exec(Tester* const previousTester, DebugStream const logOutput, DebugStream const errorOutput) {
     /* Set up the global pointer for the time during which tests are run, then
        reset it back again. The `previousTester` is needed for testing where
        there *are* two nested Tester instances. */

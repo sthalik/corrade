@@ -1423,7 +1423,7 @@ class CORRADE_TESTSUITE_EXPORT Tester {
         int exec();
 
         /* Overload needed for testing */
-        int exec(Tester* previousTester, std::ostream* logOutput, std::ostream* errorOutput);
+        int exec(Tester* previousTester, Corrade::Utility::DebugStream logOutput, Corrade::Utility::DebugStream errorOutput);
 
         /* Compare two identical types without explicit type specification */
         template<class T> void compare(const char* actual, const T& actualValue, const char* expected, const T& expectedValue) {
