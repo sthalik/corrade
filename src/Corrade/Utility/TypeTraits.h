@@ -130,7 +130,7 @@ Checking for presence of @cpp size() @ce member function:
    get() is used when T has given attribute, non-templated otherwise. Bool
    value then indicates whether the templated version was called or not. */
 #define CORRADE_HAS_TYPE(className, ...)                                    \
-template<class U> class className {                                         \
+template<class U> struct className {                                        \
     template<class T> static char get(T&&, __VA_ARGS__* = nullptr);         \
     static short get(...);                                                  \
     public:                                                                 \
