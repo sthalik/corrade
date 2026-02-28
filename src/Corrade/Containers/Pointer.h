@@ -93,7 +93,7 @@ namespace Implementation {
        where this would be a problem, but let's just hope nobody tries to abuse
        it that way. It's in the Implementation namespace for that reason, to be
        used only in static_assert() inside Pointer and nowhere else. */
-    namespace { template<class T> class IsComplete {
+    namespace { template<class T> struct IsComplete {
         template<class U> static char get(U*, decltype(sizeof(U))* = nullptr);
         static short get(...);
         public:
