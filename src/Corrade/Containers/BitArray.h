@@ -37,6 +37,7 @@
 #include "Corrade/Tags.h"
 #include "Corrade/Containers/Containers.h"
 #include "Corrade/Utility/DebugAssert.h"
+#include "Corrade/Utility/Macros.h"
 #include "Corrade/Utility/Move.h"
 #include "Corrade/Utility/Utility.h"
 #include "Corrade/Utility/visibility.h"
@@ -289,7 +290,7 @@ class CORRADE_UTILITY_EXPORT BitArray {
          * value.
          */
         /* MinGW complains loudly if the declaration doesn't also have inline */
-        inline bool operator[](std::size_t i) const;
+        CORRADE_ALWAYS_INLINE bool operator[](std::size_t i) const;
 
         /**
          * @brief Set a bit at given position
@@ -299,7 +300,7 @@ class CORRADE_UTILITY_EXPORT BitArray {
          *      @ref setAll()
          */
         /* MinGW complains loudly if the declaration doesn't also have inline */
-        inline void set(std::size_t i);
+        CORRADE_ALWAYS_INLINE void set(std::size_t i);
 
         /**
          * @brief Use @ref setAll(bool) to set all bits or @ref set(std::size_t, bool) to set a single bit to a concrete value
@@ -328,7 +329,7 @@ class CORRADE_UTILITY_EXPORT BitArray {
          * @see @ref operator[](), @ref set(), @ref resetAll()
          */
         /* MinGW complains loudly if the declaration doesn't also have inline */
-        inline void reset(std::size_t i);
+        CORRADE_ALWAYS_INLINE void reset(std::size_t i);
 
         /**
          * @brief Use @ref setAll(bool) to set all bits or @ref set(std::size_t, bool) to set a single bit to a concrete value
@@ -359,7 +360,7 @@ class CORRADE_UTILITY_EXPORT BitArray {
          * @see @ref operator[]()
          */
         /* MinGW complains loudly if the declaration doesn't also have inline */
-        inline void set(std::size_t i, bool value);
+        CORRADE_ALWAYS_INLINE void set(std::size_t i, bool value);
 
         /**
          * @brief Set or reset all bits
