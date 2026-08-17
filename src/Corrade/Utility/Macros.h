@@ -436,6 +436,14 @@ but the behavior is highly dependent on compiler-specific heuristics.
 #endif
 #endif
 
+#if defined(CORRADE_TARGET_GCC) || defined(DOXYGEN_GENERATING_OUTPUT)
+#define CORRADE_INTERNAL_EXPECT_0(...) __builtin_expect((__VA_ARGS__), 0)
+#define CORRADE_INTERNAL_EXPECT_1(...) __builtin_expect((__VA_ARGS__), 1)
+#else
+#define CORRADE_INTERNAL_EXPECT_0(...) (__VA_ARGS__)
+#define CORRADE_INTERNAL_EXPECT_1(...) (__VA_ARGS__)
+#endif
+
 /** @hideinitializer
 @brief Mark an if condition as unlikely to happen
 @m_since_latest
