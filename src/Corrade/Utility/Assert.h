@@ -331,12 +331,7 @@ to override behavior for all assertions at once.
     } while(false)
 #else
 #define CORRADE_ASSERT(condition, message, returnValue)                     \
-    do {                                                                    \
-        if(!(condition)) {                                                  \
-            CORRADE_ASSERT_MESSAGE_ABORT(message)                           \
-            return returnValue;                                             \
-        }                                                                   \
-    } while(false)
+    void(CORRADE_INTERNAL_EXPECT_1(!!(condition)) ? 0 : ([&]() { CORRADE_ASSERT_MESSAGE_ABORT(message) }(), 0))
 #endif
 #endif
 
@@ -392,9 +387,7 @@ to override behavior for all assertions at once.
     }(), 0))
 #else
 #define CORRADE_CONSTEXPR_ASSERT(condition, message)                        \
-    static_cast<void>((condition) ? 0 : ([&]() {                            \
-        CORRADE_ASSERT_MESSAGE_ABORT(message)                               \
-    }(), 0))
+    void(CORRADE_INTERNAL_EXPECT_1(!!(condition)) ? 0 : ([&]() { CORRADE_ASSERT_MESSAGE_ABORT(message) }(), 0))
 #endif
 #endif
 

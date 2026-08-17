@@ -39,6 +39,7 @@
 #include "Corrade/Tags.h"
 #include "Corrade/Containers/ArrayView.h"
 #include "Corrade/Containers/constructHelpers.h"
+#include "Corrade/Utility/Macros.h"
 
 namespace Corrade { namespace Containers {
 
@@ -698,8 +699,8 @@ class Array {
          * Expects there is at least one element.
          * @see @ref isEmpty(), @ref begin(), @ref operator[]()
          */
-        T& front();
-        const T& front() const; /**< @overload */
+        CORRADE_ALWAYS_INLINE T& front();
+        CORRADE_ALWAYS_INLINE const T& front() const; /**< @overload */
 
         /**
          * @brief Last element
@@ -707,8 +708,8 @@ class Array {
          * Expects there is at least one element.
          * @see @ref isEmpty(), @ref end(), @ref operator[]()
          */
-        T& back();
-        const T& back() const; /**< @overload */
+        CORRADE_ALWAYS_INLINE T& back();
+        CORRADE_ALWAYS_INLINE const T& back() const; /**< @overload */
 
         /**
          * @brief Element access
@@ -729,8 +730,8 @@ class Array {
            builtin operator[] for pointers if an int or ssize_t is used due to
            the implicit pointer conversion. Sigh. */
         /** @todo clean up once implicit pointer conversion is removed */
-        template<class U, typename std::enable_if<std::is_convertible<U, std::size_t>::value, int>::type = 0> T& operator[](U i);
-        template<class U, typename std::enable_if<std::is_convertible<U, std::size_t>::value, int>::type = 0> const T& operator[](U i) const;
+        template<class U, typename std::enable_if<std::is_convertible<U, std::size_t>::value, int>::type = 0> CORRADE_ALWAYS_INLINE T& operator[](U i);
+        template<class U, typename std::enable_if<std::is_convertible<U, std::size_t>::value, int>::type = 0> CORRADE_ALWAYS_INLINE const T& operator[](U i) const;
         #endif
 
         /**
