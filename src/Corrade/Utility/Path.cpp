@@ -954,11 +954,9 @@ Containers::Optional<Containers::Array<Containers::String>> list(const Container
 
     Containers::Array<Containers::String> list;
 
-    /* Explicitly add `.` for compatibility with other systems */
-    if(!(flags & (ListFlag::SkipDotAndDotDot|ListFlag::SkipDirectories)))
-        arrayAppend(list, "."_s);
-
-    while(FindNextFileW(hFile, &data) != 0 || GetLastError() != ERROR_NO_MORE_FILES) {
+    /* FindFirstFileW() already put the first entry into `data`. It's usually
+       `.`, but drive roots have no dot entries, so it can be a regular file. */
+    do {
         if((flags >= ListFlag::SkipDirectories) && (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
             continue;
         if((flags >= ListFlag::SkipFiles) && !(data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
@@ -966,14 +964,19 @@ Containers::Optional<Containers::Array<Containers::String>> list(const Container
         /** @todo symlink support */
         /** @todo are there any special files in WINAPI? */
 
-        /* Not testing for dot, as it is not listed on Windows. Also it doesn't
-           cause any unnecessary temporary allocation if SkipDotAndDotDot is
-           used because `..` fits easily into SSO. */
         Containers::String file = Unicode::narrow(data.cFileName);
-        if((flags >= ListFlag::SkipDotAndDotDot) && file == ".."_s)
+        if((flags >= ListFlag::SkipDotAndDotDot) && (file == "."_s || file == ".."_s))
             continue;
 
         arrayAppend(list, Utility::move(file));
+    } while(FindNextFileW(hFile, &data));
+
+    const DWORD error = GetLastError();
+    if(error != ERROR_NO_MORE_FILES) {
+        Error err;
+        err << "Utility::Path::list(): can't list" << path << Debug::nospace << ":";
+        Utility::Implementation::printWindowsErrorString(err, error);
+        return {};
     }
     #else
     #error
