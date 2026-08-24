@@ -74,6 +74,10 @@ Containers::Array<char*> convertWideArgv(std::size_t argc, wchar_t** wargv, Cont
     for(std::size_t i = 0; i != argc; ++i)
         WideCharToMultiByte(CP_UTF8, 0, wargv[i], -1, argv[i], argv[i + 1] - argv[i], nullptr, nullptr);
 
+    /* The last slot was needed as one-past-end during the conversion above,
+       but C requires argv[argc] to be null */
+    argv[argc] = nullptr;
+
     return argv;
 }
 
