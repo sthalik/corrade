@@ -596,9 +596,11 @@ Debug::Debug(std::ostream* const output, const Flags flags): _flags{flags}, _imm
     #if defined(CORRADE_TARGET_WINDOWS) && !defined(CORRADE_UTILITY_USE_ANSI_COLORS)
     HANDLE h = streamOutputHandle(_output);
     if(h != INVALID_HANDLE_VALUE) {
+        /* Fails for non-console character devices (e.g. `2> NUL`), which
+           _isatty() still reports as a TTY. Keep the default then. */
         CONSOLE_SCREEN_BUFFER_INFO csbi;
-        GetConsoleScreenBufferInfo(h, &csbi);
-        _previousColorAttributes = csbi.wAttributes;
+        if(GetConsoleScreenBufferInfo(h, &csbi))
+            _previousColorAttributes = csbi.wAttributes;
     }
     #else
     _previousColor = debugGlobals.color;
