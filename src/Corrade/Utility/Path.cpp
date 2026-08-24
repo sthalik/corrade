@@ -1016,7 +1016,7 @@ Containers::Optional<std::size_t> size(std::FILE* const f) {
         #ifndef CORRADE_TARGET_WINDOWS
         lseek(fileno(f), 0, SEEK_END) == -1
         #else
-        _lseek(_fileno(f), 0, SEEK_END) == -1
+        _lseeki64(_fileno(f), 0, SEEK_END) == -1
         #endif
     ) return {};
     #else
