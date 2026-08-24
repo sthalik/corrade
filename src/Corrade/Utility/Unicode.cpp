@@ -192,10 +192,15 @@ Containers::String narrow(const wchar_t* const text, const int size) {
        guarantee itself */
     if(!size)
         return {};
+    const int resultSize = WideCharToMultiByte(CP_UTF8, 0, text, size, nullptr, 0, nullptr, nullptr);
+    /* Returns 0 on failure -- with size == -1 the subtraction below would
+       then underflow to a SIZE_MAX allocation */
+    if(resultSize <= 0)
+        return {};
     /* WCtoMB counts the trailing \0 into the size, which we have to cut.
        Containers::String takes care of allocating extra for the null
        terminator so we don't need to do that explicitly. */
-    Containers::String result{NoInit, std::size_t(WideCharToMultiByte(CP_UTF8, 0, text, size, nullptr, 0, nullptr, nullptr) - (size == -1 ? 1 : 0))};
+    Containers::String result{NoInit, std::size_t(resultSize) - (size == -1 ? 1 : 0)};
     WideCharToMultiByte(CP_UTF8, 0, text, size, result.data(), result.size(), nullptr, nullptr);
     return result;
 }
