@@ -1398,8 +1398,17 @@ Containers::Optional<Containers::Array<char, MapDeleter>> map(const Containers::
         return {};
     }
 
-    /* Get file size */
-    const std::size_t size = GetFileSize(hFile, nullptr);
+    /* Get file size. GetFileSize() would return only the low 32 bits, with
+       0xffffffff doubling as the error value. */
+    LARGE_INTEGER fileSize;
+    if(!GetFileSizeEx(hFile, &fileSize)) {
+        Error err;
+        err << "Utility::Path::map(): can't get size of" << filename << Debug::nospace << ":";
+        Utility::Implementation::printWindowsErrorString(err, GetLastError());
+        CloseHandle(hFile);
+        return {};
+    }
+    const std::size_t size = std::size_t(fileSize.QuadPart);
 
     /* Can't call CreateFileMapping() with a zero size, so if the file is empty
        just set the pointer to null -- but for consistency keep the handle open
@@ -1485,8 +1494,16 @@ Containers::Optional<Containers::Array<const char, MapDeleter>> mapRead(const Co
         return {};
     }
 
-    /* Get file size */
-    const std::size_t size = GetFileSize(hFile, nullptr);
+    /* Get file size. Same as in map() above, GetFileSize() would truncate. */
+    LARGE_INTEGER fileSize;
+    if(!GetFileSizeEx(hFile, &fileSize)) {
+        Error err;
+        err << "Utility::Path::mapRead(): can't get size of" << filename << Debug::nospace << ":";
+        Utility::Implementation::printWindowsErrorString(err, GetLastError());
+        CloseHandle(hFile);
+        return {};
+    }
+    const std::size_t size = std::size_t(fileSize.QuadPart);
 
     /* Can't call CreateFileMapping() with a zero size, so if the file is empty
        just set the pointer to null -- but for consistency keep the handle open
