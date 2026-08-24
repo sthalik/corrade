@@ -84,6 +84,13 @@ void printWindowsErrorString(Debug& debug, unsigned int errorCode) {
     WCHAR errorStringW[256];
     const std::size_t sizeW = FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM|FORMAT_MESSAGE_IGNORE_INSERTS, nullptr, errorCode, 0, errorStringW, Containers::arraySize(errorStringW), nullptr);
 
+    /* Returns 0 e.g. for error codes owned by third-party modules, and the
+       subtraction below would underflow. Print at least the number then. */
+    if(sizeW < 2) {
+        debug << "error" << errorCode;
+        return;
+    }
+
     /* Cut off final newline that FormatMessage adds and convert to UTF-8. Yes,
        a \r\n, IT'S WINDOWS, BABY!!! */
     char errorString[256];
