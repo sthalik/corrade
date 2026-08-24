@@ -591,8 +591,15 @@ Containers::Optional<Containers::String> libraryLocation(const void* address) {
 
     /** @todo get rid of MAX_PATH */
     wchar_t path[MAX_PATH + 1];
-    /* Returns size *without* the null terminator */
+    /* Returns size *without* the null terminator on success, 0 on failure and
+       the buffer size on truncation */
     const std::size_t size = GetModuleFileNameW(module, path, Containers::arraySize(path));
+    if(!size || size == Containers::arraySize(path)) {
+        Error err;
+        err << "Utility::Path::libraryLocation(): can't get library location:";
+        Utility::Implementation::printWindowsErrorString(err, GetLastError());
+        return {};
+    }
     return fromNativeSeparators(Unicode::narrow(Containers::arrayView(path, size)));
     #endif
 }
@@ -661,8 +668,15 @@ Containers::Optional<Containers::String> executableLocation() {
     #elif defined(CORRADE_TARGET_WINDOWS) && !defined(CORRADE_TARGET_WINDOWS_RT)
     /** @todo get rid of MAX_PATH */
     wchar_t path[MAX_PATH + 1];
-    /* Returns size *without* the null terminator */
+    /* Returns size *without* the null terminator on success, 0 on failure and
+       the buffer size on truncation */
     const std::size_t size = GetModuleFileNameW(nullptr, path, Containers::arraySize(path));
+    if(!size || size == Containers::arraySize(path)) {
+        Error err;
+        err << "Utility::Path::executableLocation(): can't get executable location:";
+        Utility::Implementation::printWindowsErrorString(err, GetLastError());
+        return {};
+    }
     return fromNativeSeparators(Unicode::narrow(Containers::arrayView(path, size)));
 
     /* hardcoded for Emscripten */
