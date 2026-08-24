@@ -362,7 +362,11 @@ LoadState AbstractManager::unloadRecursiveInternal(Implementation::Plugin& plugi
     while(!plugin.usedBy.isEmpty()) {
         const auto found = _state->plugins.find(plugin.usedBy.front());
         CORRADE_INTERNAL_ASSERT(found != _state->plugins.end());
-        return unloadRecursiveInternal(*found->second);
+        /* Unloading the dependent removes it from usedBy. If it could not be
+           unloaded, stop -- unloadInternal() below then reports this plugin
+           as still required. */
+        if(!(unloadRecursiveInternal(*found->second) & LoadState::NotLoaded))
+            break;
     }
 
     /* Unload the plugin */
