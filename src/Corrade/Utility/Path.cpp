@@ -721,13 +721,32 @@ Containers::Optional<Containers::String> currentDirectory() {
 
     /* Windows (not RT) */
     #elif defined(CORRADE_TARGET_WINDOWS) && !defined(CORRADE_TARGET_WINDOWS_RT)
-    /* Querying without a buffer returns size with the null terminator ... */
-    const std::size_t sizePlusOne = GetCurrentDirectoryW(0, nullptr);
-    CORRADE_INTERNAL_ASSERT(sizePlusOne);
-    Containers::Array<wchar_t> path{NoInit, sizePlusOne};
-    /* ... but retrieving the data returns size without it */
-    CORRADE_INTERNAL_ASSERT_OUTPUT(GetCurrentDirectoryW(sizePlusOne, path.data()) == sizePlusOne - 1);
-    return fromNativeSeparators(Unicode::narrow(path.exceptSuffix(1)));
+    /* The directory can change between the size query and the retrieval, so
+       loop until the buffer is large enough for what the second call sees */
+    Containers::Array<wchar_t> path;
+    std::size_t size;
+    while(true) {
+        /* Querying without a buffer returns size with the null terminator ... */
+        const std::size_t sizePlusOne = GetCurrentDirectoryW(0, nullptr);
+        if(!sizePlusOne) {
+            size = 0;
+            break;
+        }
+
+        path = Containers::Array<wchar_t>{NoInit, sizePlusOne};
+        /* ... but retrieving the data returns size without it, or the newly
+           required size with it again if the directory grew in the meantime */
+        size = GetCurrentDirectoryW(sizePlusOne, path.data());
+        if(size < sizePlusOne)
+            break;
+    }
+    if(!size) {
+        Error err;
+        err << "Utility::Path::currentDirectory():";
+        Utility::Implementation::printWindowsErrorString(err, GetLastError());
+        return {};
+    }
+    return fromNativeSeparators(Unicode::narrow(path.prefix(size)));
 
     /* Use the root path on Emscripten */
     #elif defined(CORRADE_TARGET_EMSCRIPTEN)
