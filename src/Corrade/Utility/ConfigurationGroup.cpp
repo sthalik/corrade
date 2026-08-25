@@ -101,6 +101,11 @@ ConfigurationGroup::ConfigurationGroup(ConfigurationGroup&& other) noexcept: _va
 }
 
 ConfigurationGroup& ConfigurationGroup::operator=(const ConfigurationGroup& other) {
+    /* On self-assignment the delete below would free the groups that are then
+       deep-copied from */
+    if(&other == this)
+        return *this;
+
     /* Delete current groups */
     for(Group& group: _groups)
         delete group.group;
@@ -119,6 +124,9 @@ ConfigurationGroup& ConfigurationGroup::operator=(const ConfigurationGroup& othe
 }
 
 ConfigurationGroup& ConfigurationGroup::operator=(ConfigurationGroup&& other) noexcept {
+    if(&other == this)
+        return *this;
+
     /* Delete current groups */
     for(Group& group: _groups)
         delete group.group;
