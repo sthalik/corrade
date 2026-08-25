@@ -1577,7 +1577,7 @@ Containers::Optional<Containers::Array<char, MapDeleter>> mapWrite(const Contain
     #ifdef CORRADE_TARGET_UNIX
     /* Open the file for writing. Create if it doesn't exist, truncate it if it
        does. */
-    const int fd = open(filename.data(), O_RDWR|O_CREAT|O_TRUNC, mode_t(0600));
+    const int fd = open(Containers::String::nullTerminatedView(filename).data(), O_RDWR|O_CREAT|O_TRUNC, mode_t(0600));
     if(fd == -1) {
         Error err;
         err << "Utility::Path::mapWrite(): can't open" << filename << Debug::nospace << ":";
