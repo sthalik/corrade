@@ -309,7 +309,19 @@ class CORRADE_UTILITY_EXPORT Resource {
          */
         explicit Resource(Containers::StringView group);
 
+        /** @brief Copying is not allowed */
+        Resource(const Resource&) = delete;
+
+        /** @brief Move constructor */
+        Resource(Resource&& other) noexcept;
+
         ~Resource();
+
+        /** @brief Copying is not allowed */
+        Resource& operator=(const Resource&) = delete;
+
+        /** @brief Move assignment */
+        Resource& operator=(Resource&& other) noexcept;
 
         /**
          * @brief List of all files in the group

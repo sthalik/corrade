@@ -34,6 +34,7 @@
 #include "Corrade/Containers/StringIterable.h"
 #include "Corrade/Containers/Implementation/RawForwardList.h"
 #include "Corrade/Utility/Assert.h"
+#include "Corrade/Utility/Move.h"
 #include "Corrade/Utility/Configuration.h"
 #include "Corrade/Utility/ConfigurationGroup.h"
 #include "Corrade/Utility/Path.h"
@@ -177,6 +178,16 @@ Resource::Resource(const Containers::StringView group): _group{findGroup(group)}
                 << group << Debug::nospace << "'";
         }
     }
+}
+
+Resource::Resource(Resource&& other) noexcept: _group{other._group}, _overrideGroup{other._overrideGroup} {
+    other._overrideGroup = nullptr;
+}
+
+Resource& Resource::operator=(Resource&& other) noexcept {
+    Utility::swap(_group, other._group);
+    Utility::swap(_overrideGroup, other._overrideGroup);
+    return *this;
 }
 
 Resource::~Resource() {
