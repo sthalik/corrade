@@ -1492,6 +1492,7 @@ Containers::Optional<Containers::Array<const char, MapDeleter>> mapRead(const Co
        silent errors, see isDirectory(int) for details */
     if(isDirectory(fd)) {
         Error{} << "Utility::Path::mapRead():" << filename << "is a directory";
+        close(fd);
         return {};
     }
 
