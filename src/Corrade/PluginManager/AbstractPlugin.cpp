@@ -75,7 +75,10 @@ AbstractPlugin::AbstractPlugin(AbstractManager& manager): _state{InPlaceInit} {
 AbstractPlugin::AbstractPlugin(AbstractManager& manager, const Containers::StringView& plugin): AbstractPlugin{manager} {
     _state->plugin = Containers::String::nullTerminatedGlobalView(plugin);
     manager.registerInstance(plugin, *this, _state->metadata);
-    _state->configuration = _state->metadata->configuration();
+    /* With CORRADE_GRACEFUL_ASSERT the registration can fail without ever
+       touching the metadata pointer */
+    if(_state->metadata)
+        _state->configuration = _state->metadata->configuration();
 }
 
 AbstractPlugin::AbstractPlugin(AbstractPlugin&& other) noexcept: _state{Utility::move(other._state)} {
