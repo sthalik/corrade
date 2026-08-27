@@ -359,6 +359,11 @@ LoadState AbstractManager::unloadRecursiveInternal(Implementation::Plugin& plugi
        destructor after we verified there are no other managers using this for
        external dependencies, so everything the usedBy list is in this manager
        as well */
+    /* Terminates because usedBy shrinks each iteration -- unloadInternal()
+       removes the dependent from its dependencies' usedBy lists before it
+       returns NotLoaded. Its early NotLoaded return removes nothing, but a
+       plugin that isn't loaded never appears in a usedBy list, so that path
+       can't be reached from here. */
     while(!plugin.usedBy.isEmpty()) {
         const auto found = _state->plugins.find(plugin.usedBy.front());
         CORRADE_INTERNAL_ASSERT(found != _state->plugins.end());
