@@ -93,10 +93,6 @@ Utility::Debug& operator<<(Utility::Debug& debug, const StringViewFlags value) {
 }
 #endif
 
-template<class T> BasicStringView<T>::BasicStringView(T* const data, const StringViewFlags flags, std::nullptr_t) noexcept: BasicStringView{data,
-    data ? std::strlen(data) : 0,
-    flags|(data ? StringViewFlag::NullTerminated : StringViewFlag::Global)} {}
-
 template<class T> BasicStringView<T>::BasicStringView(String& string) noexcept: BasicStringView{string.data(), string.size(), string.viewFlags()} {}
 
 /* Yes, I'm also surprised this works. On Windows (MSVC, clang-cl and MinGw) it
