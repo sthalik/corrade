@@ -139,6 +139,9 @@ if(NOT CMAKE_CXX_FLAGS MATCHES "-std=")
             ContainersPairCpp14Test
             ContainersTripleCpp14Test
             PROPERTIES CORRADE_CXX_STANDARD 14)
+        corrade_add_test(ContainersStringViewCpp14Test StringViewCpp14Test.cpp)
+        # A parent project's CMAKE_CXX_STANDARD overrides CORRADE_CXX_STANDARD
+        set_target_properties(ContainersStringViewCpp14Test PROPERTIES CXX_STANDARD 14)
    endif()
 
     # Copied verbatim from src/Corrade/Test/CMakeLists.txt, please keep in sync
