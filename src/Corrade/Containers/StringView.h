@@ -114,6 +114,16 @@ namespace Implementation {
     enum: std::size_t {
         StringViewSizeMask = std::size_t(StringViewFlag::NullTerminated)|std::size_t(StringViewFlag::Global)
     };
+
+    template<class T> CORRADE_CONSTEXPR14 std::size_t my_strlen(T* data) {
+        #if defined(CORRADE_TARGET_GCC) || defined(CORRADE_TARGET_CLANG) || (defined(CORRADE_TARGET_MSVC) && _MSC_VER >= 1928)
+        return __builtin_strlen(data);
+        #else
+        T* const start = data;
+        for(; *data; ++data);
+        return std::size_t(data - start);
+        #endif
+    }
 }
 
 /**
@@ -411,11 +421,8 @@ BasicStringView {
          * @see @ref BasicStringView(T*, StringViewFlags)
          */
         constexpr /*implicit*/ BasicStringView(T* data, std::size_t size, StringViewFlags flags = {}) noexcept: _data{data}, _sizePlusFlags{(
-            /* This ends up being called from BasicStringView(T*, Flags), so
-               basically on every implicit conversion from a C string, thus
-               the release build perf aspect wins over safety. Additionally,
-               it makes little sense to check the size constraint on 64-bit, if
-               64-bit code happens to go over then it's got bigger problems
+            /* It makes little sense to check the size constraint on 64-bit,
+               if 64-bit code happens to go over then it's got bigger problems
                than this assert. */
             #ifdef CORRADE_TARGET_32BIT
             CORRADE_CONSTEXPR_DEBUG_ASSERT(size < std::size_t{1} << (sizeof(std::size_t)*8 - 2),
@@ -522,15 +529,15 @@ BasicStringView {
          * Contrary to the behavior of @ref std::string, @p data is allowed to
          * be @cpp nullptr @ce --- in that case an empty view is constructed.
          *
-         * Calls @ref BasicStringView(T*, std::size_t, StringViewFlags) with
-         * @p size set to @ref std::strlen() of @p data if @p data is not
-         * @cpp nullptr @ce. If @p data is @cpp nullptr @ce, @p size is set to
-         * @cpp 0 @ce. In addition to @p extraFlags, if @p data is not
-         * @cpp nullptr @ce, @ref StringViewFlag::NullTerminated is set,
-         * otherwise @ref StringViewFlag::Global is set.
+         * If @p data is not @cpp nullptr @ce, the size is
+         * @ref std::strlen() of @p data and
+         * @ref StringViewFlag::NullTerminated is set in addition to
+         * @p extraFlags. Otherwise the size is @cpp 0 @ce and only
+         * @ref StringViewFlag::Global is set.
          *
-         * The @ref BasicStringView(std::nullptr_t) overload (which is a
-         * default constructor) is additionally @cpp constexpr @ce.
+         * This constructor is @cpp constexpr @ce in C++14 and newer. The
+         * @ref BasicStringView(std::nullptr_t) overload (which is a default
+         * constructor) is @cpp constexpr @ce in C++11 as well.
          */
         #ifdef DOXYGEN_GENERATING_OUTPUT
         /*implicit*/ BasicStringView(T* data, StringViewFlags extraFlags = {}) noexcept;
@@ -541,7 +548,7 @@ BasicStringView {
            constructZeroNullPointerAmbiguity() test for more info. FFS, zero as
            null pointer was deprecated in C++11 already, why is this still a
            problem?! */
-        template<class U, typename std::enable_if<std::is_pointer<U>::value && std::is_convertible<const U&, T*>::value, int>::type = 0> /*implicit*/ BasicStringView(U data, StringViewFlags extraFlags = {}) noexcept: BasicStringView{data, extraFlags, nullptr} {}
+        template<class U, typename std::enable_if<std::is_pointer<U>::value && std::is_convertible<const U&, T*>::value, int>::type = 0> CORRADE_CONSTEXPR14 /*implicit*/ BasicStringView(U data, StringViewFlags extraFlags = {}) noexcept: BasicStringView{data, data ? Implementation::my_strlen(data) : 0, extraFlags, nullptr} {}
         #endif
 
         /**
@@ -1406,9 +1413,15 @@ BasicStringView {
         template<class U, typename std::enable_if<std::is_same<T, U>::value, int>::type = 0> constexpr explicit BasicStringView(StringViewFlags flags, ArrayView<U> data) noexcept: BasicStringView{data.data(), data.size(), flags} {}
         #endif
 
-        /* Used by the char* constructor, delinlined because it calls into
-           std::strlen() */
-        explicit BasicStringView(T* data, StringViewFlags flags, std::nullptr_t) noexcept;
+        /* Used by the char* constructor. Skips the public constructor's
+           NullTerminated assert, which can't fail after strlen. */
+        constexpr explicit BasicStringView(T* data, std::size_t size, StringViewFlags flags, std::nullptr_t) noexcept: _data{data}, _sizePlusFlags{(
+            #ifdef CORRADE_TARGET_32BIT
+            CORRADE_CONSTEXPR_DEBUG_ASSERT(size < std::size_t{1} << (sizeof(std::size_t)*8 - 2),
+                "Containers::StringView: string expected to be smaller than 2^" << Utility::Debug::nospace << sizeof(std::size_t)*8 - 2 << "bytes, got" << size),
+            #endif
+            size|(data ? std::size_t(flags|StringViewFlag::NullTerminated) & Implementation::StringViewSizeMask :
+                         std::size_t(StringViewFlag::Global)))} {}
 
         /* Used by slice() to skip unneeded checks in the public constexpr
            constructor */
