@@ -41,6 +41,7 @@
 #include "Corrade/Containers/Containers.h"
 #include "Corrade/Containers/EnumSet.h"
 #include "Corrade/Utility/DebugAssert.h"
+#include "Corrade/Utility/Macros.h"
 #include "Corrade/Utility/Move.h"
 #ifndef CORRADE_SINGLES_NO_DEBUG
 #include "Corrade/Utility/Utility.h"
@@ -548,7 +549,7 @@ BasicStringView {
            constructZeroNullPointerAmbiguity() test for more info. FFS, zero as
            null pointer was deprecated in C++11 already, why is this still a
            problem?! */
-        template<class U, typename std::enable_if<std::is_pointer<U>::value && std::is_convertible<const U&, T*>::value, int>::type = 0> CORRADE_CONSTEXPR14 /*implicit*/ BasicStringView(U data, StringViewFlags extraFlags = {}) noexcept: BasicStringView{data, data ? Implementation::my_strlen(data) : 0, extraFlags, nullptr} {}
+        template<class U, typename std::enable_if<std::is_pointer<U>::value && std::is_convertible<const U&, T*>::value, int>::type = 0> CORRADE_ALWAYS_INLINE CORRADE_CONSTEXPR14 /*implicit*/ BasicStringView(U data, StringViewFlags extraFlags = {}) noexcept: BasicStringView{data, data ? Implementation::my_strlen(data) : 0, extraFlags, nullptr} {}
         #endif
 
         /**
@@ -1415,7 +1416,7 @@ BasicStringView {
 
         /* Used by the char* constructor. Skips the public constructor's
            NullTerminated assert, which can't fail after strlen. */
-        constexpr explicit BasicStringView(T* data, std::size_t size, StringViewFlags flags, std::nullptr_t) noexcept: _data{data}, _sizePlusFlags{(
+        CORRADE_ALWAYS_INLINE constexpr explicit BasicStringView(T* data, std::size_t size, StringViewFlags flags, std::nullptr_t) noexcept: _data{data}, _sizePlusFlags{(
             #ifdef CORRADE_TARGET_32BIT
             CORRADE_CONSTEXPR_DEBUG_ASSERT(size < std::size_t{1} << (sizeof(std::size_t)*8 - 2),
                 "Containers::StringView: string expected to be smaller than 2^" << Utility::Debug::nospace << sizeof(std::size_t)*8 - 2 << "bytes, got" << size),

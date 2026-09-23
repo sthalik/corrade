@@ -35,6 +35,7 @@
 
 #include "Corrade/Tags.h"
 #include "Corrade/Containers/Containers.h" /* for template default args */
+#include "Corrade/Utility/Macros.h"
 
 namespace Corrade { namespace Containers {
 
@@ -106,7 +107,7 @@ class EnumSet {
         };
 
         /** @brief Create an empty set */
-        constexpr /*implicit*/ EnumSet() noexcept: _value{} {}
+        CORRADE_ALWAYS_INLINE constexpr /*implicit*/ EnumSet() noexcept: _value{} {}
 
         /** @brief Create a set from one value */
         constexpr /*implicit*/ EnumSet(T value) noexcept:
