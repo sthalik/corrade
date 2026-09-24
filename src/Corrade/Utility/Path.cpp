@@ -564,6 +564,30 @@ bool move(Containers::StringView from, Containers::StringView to) {
     #endif
 }
 
+#if defined(CORRADE_TARGET_WINDOWS) && !defined(CORRADE_TARGET_WINDOWS_RT)
+namespace {
+
+Containers::Optional<Containers::String> moduleFileName(const HMODULE module, const char* const message) {
+    /* Longest path Windows supports plus the null terminator. 64 kB, so not
+       on the stack. */
+    constexpr DWORD capacity = 32768;
+    Containers::Array<wchar_t> path{NoInit, capacity};
+    /* Returns size *without* the null terminator, or the capacity if the path
+       got truncated */
+    const DWORD size = GetModuleFileNameW(module, path.data(), capacity);
+    if(!size || size == capacity) {
+        const DWORD error = GetLastError();
+        Error err;
+        err << message;
+        Utility::Implementation::printWindowsErrorString(err, error);
+        return {};
+    }
+    return fromNativeSeparators(Unicode::narrow(path.prefix(size)));
+}
+
+}
+#endif
+
 #if defined(CORRADE_TARGET_UNIX) || (defined(CORRADE_TARGET_WINDOWS) && !defined(CORRADE_TARGET_WINDOWS_RT))
 Containers::Optional<Containers::String> libraryLocation(const void* address) {
     /* Linux (and macOS as well, even though Linux man pages don't mention that) */
@@ -589,11 +613,7 @@ Containers::Optional<Containers::String> libraryLocation(const void* address) {
         return {};
     }
 
-    /** @todo get rid of MAX_PATH */
-    wchar_t path[MAX_PATH + 1];
-    /* Returns size *without* the null terminator */
-    const std::size_t size = GetModuleFileNameW(module, path, Containers::arraySize(path));
-    return fromNativeSeparators(Unicode::narrow(Containers::arrayView(path, size)));
+    return moduleFileName(module, "Utility::Path::libraryLocation(): can't get library location:");
     #endif
 }
 
@@ -659,11 +679,9 @@ Containers::Optional<Containers::String> executableLocation() {
 
     /* Windows (not RT) */
     #elif defined(CORRADE_TARGET_WINDOWS) && !defined(CORRADE_TARGET_WINDOWS_RT)
-    /** @todo get rid of MAX_PATH */
-    wchar_t path[MAX_PATH + 1];
-    /* Returns size *without* the null terminator */
-    const std::size_t size = GetModuleFileNameW(nullptr, path, Containers::arraySize(path));
-    return fromNativeSeparators(Unicode::narrow(Containers::arrayView(path, size)));
+    /* Doesn't change while the process runs, so it's fetched only once */
+    static const Containers::Optional<Containers::String> path = moduleFileName(nullptr, "Utility::Path::executableLocation(): can't get executable location:");
+    return path;
 
     /* hardcoded for Emscripten */
     #elif defined(CORRADE_TARGET_EMSCRIPTEN)
