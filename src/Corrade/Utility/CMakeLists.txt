@@ -45,6 +45,7 @@ endif()
 if(CORRADE_WITH_UTILITY)
     set(CorradeUtility_SRCS
         Debug.cpp
+        MyAssert.cpp
         ConfigurationValue.cpp
         MurmurHash2.cpp
         Sha1.cpp
@@ -118,6 +119,7 @@ if(CORRADE_WITH_UTILITY)
         Macros.h
         Math.h
         Memory.h
+        MyAssert.h
         Move.h
         MurmurHash2.h
         Path.h
@@ -334,6 +336,7 @@ if(CORRADE_WITH_RC)
     set(CorradeUtilityRc_SRCS
         Arguments.cpp
         Debug.cpp
+        MyAssert.cpp
         Configuration.cpp
         ConfigurationGroup.cpp
         ConfigurationValue.cpp
