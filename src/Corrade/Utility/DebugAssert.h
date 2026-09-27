@@ -1,3 +1,4 @@
+#include "Corrade/Utility/MyAssert.h"
 #ifndef Corrade_Utility_DebugAssert_h
 #define Corrade_Utility_DebugAssert_h
 /*
