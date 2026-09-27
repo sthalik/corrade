@@ -1,3 +1,4 @@
+#include "Corrade/Utility/MyAssert.h"
 #ifdef CORRADE_ASSERT_INCLUDE
 /* Include the user-provided header if desired. Do this before the header guard
    is defined so in case the user-provided header directly or transitively
