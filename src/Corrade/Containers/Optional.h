@@ -39,8 +39,26 @@
 #include "Corrade/Tags.h"
 #include "Corrade/Containers/constructHelpers.h"
 #include "Corrade/Utility/DebugAssert.h"
+#include "Corrade/Utility/Macros.h"
 #ifndef CORRADE_SINGLES_NO_DEBUG
 #include "Corrade/Utility/Debug.h"
+#endif
+
+#ifndef CORRADE_CONTAINERS_NO_SANITIZER_ANNOTATIONS
+#ifdef __has_feature
+#if __has_feature(address_sanitizer)
+#define _CORRADE_CONTAINERS_OPTIONAL_SANITIZER_ENABLED
+#endif
+#endif
+#ifdef __SANITIZE_ADDRESS__
+#define _CORRADE_CONTAINERS_OPTIONAL_SANITIZER_ENABLED
+#endif
+#endif
+
+#ifdef _CORRADE_CONTAINERS_OPTIONAL_SANITIZER_ENABLED
+#include <cstddef>
+extern "C" void __asan_poison_memory_region(void const volatile* addr, std::size_t size);
+extern "C" void __asan_unpoison_memory_region(void const volatile* addr, std::size_t size);
 #endif
 
 namespace Corrade { namespace Containers {
@@ -134,7 +152,9 @@ template<class T> class Optional {
          * Creates an optional object in empty state.
          * @see @ref operator bool(), @ref emplace()
          */
-        /*implicit*/ Optional(NullOptT = NullOpt) noexcept: _set{false} {}
+        /*implicit*/ Optional(NullOptT = NullOpt) noexcept: _set{false} {
+            poisonValue();
+        }
 
         /**
          * @brief Construct optional object by copy
@@ -251,6 +271,9 @@ template<class T> class Optional {
         ~Optional() {
             if(_set)
                 _value.~T();
+            else
+                /* The owner may reuse the storage for anything */
+                unpoisonValue();
         }
 
         /**
@@ -374,6 +397,23 @@ template<class T> class Optional {
         template<class ...Args> T& emplace(Args&&... args);
 
     private:
+        /* An empty optional's storage is poisoned if it's at least 8 bytes.
+           ASan can poison only the tail of an 8-byte granule, so if _set
+           shares the value's last granule, that granule stays readable. */
+        #ifdef _CORRADE_CONTAINERS_OPTIONAL_SANITIZER_ENABLED
+        CORRADE_ALWAYS_INLINE void poisonValue() noexcept {
+            if(sizeof(T) >= 8)
+                __asan_poison_memory_region(&_value, sizeof(T));
+        }
+        CORRADE_ALWAYS_INLINE void unpoisonValue() noexcept {
+            if(sizeof(T) >= 8)
+                __asan_unpoison_memory_region(&_value, sizeof(T));
+        }
+        #else
+        CORRADE_ALWAYS_INLINE void poisonValue() noexcept {}
+        CORRADE_ALWAYS_INLINE void unpoisonValue() noexcept {}
+        #endif
+
         union {
             T _value;
             /* GCC 4.8, 7, 9, 10, 11, 12, 13 in Release produces a "warning:
@@ -510,6 +550,8 @@ template<class T> Optional<T>::Optional(const Optional<T>& other) noexcept(std::
         #else
         new(&_value) T{other._value};
         #endif
+    else
+        poisonValue();
 }
 
 template<class T> Optional<T>::Optional(Optional<T>&& other) noexcept(std::is_nothrow_move_constructible<T>::value): _set(other._set) {
@@ -520,11 +562,15 @@ template<class T> Optional<T>::Optional(Optional<T>&& other) noexcept(std::is_no
         #else
         new(&_value) T{Utility::move(other._value)};
         #endif
+    else
+        poisonValue();
 }
 
 template<class T> Optional<T>& Optional<T>::operator=(const Optional<T>& other) noexcept(std::is_nothrow_copy_assignable<T>::value) {
     if(_set)
         _value.~T();
+    else
+        unpoisonValue();
     if((_set = other._set))
         /* Can't use {}, see the GCC 4.8-specific overload for details */
         #if defined(CORRADE_TARGET_GCC) && !defined(CORRADE_TARGET_CLANG) && __GNUC__ < 5
@@ -532,6 +578,8 @@ template<class T> Optional<T>& Optional<T>::operator=(const Optional<T>& other) 
         #else
         new(&_value) T{other._value};
         #endif
+    else
+        poisonValue();
     return *this;
 }
 
@@ -542,6 +590,8 @@ template<class T> Optional<T>& Optional<T>::operator=(Optional<T>&& other) noexc
     } else {
         if(_set)
             _value.~T();
+        else
+            unpoisonValue();
         if((_set = other._set))
             /* Can't use {}, see the GCC 4.8-specific overload for details */
             #if defined(CORRADE_TARGET_GCC) && !defined(CORRADE_TARGET_CLANG) && __GNUC__ < 5
@@ -549,13 +599,17 @@ template<class T> Optional<T>& Optional<T>::operator=(Optional<T>&& other) noexc
             #else
             new(&_value) T{Utility::move(other._value)};
             #endif
+        else
+            poisonValue();
     }
     return *this;
 }
 
 template<class T> Optional<T>& Optional<T>::operator=(NullOptT) noexcept {
-    if(_set)
+    if(_set) {
         _value.~T();
+        poisonValue();
+    }
     _set = false;
     return *this;
 }
@@ -565,6 +619,8 @@ template<class T> template<class ...Args> T& Optional<T>::emplace(Args&&... args
        non-copyable types as well. */
     if(_set)
         _value.~T();
+    else
+        unpoisonValue();
     Implementation::construct<T>(_value, Utility::forward<Args>(args)...);
     /* For exception safety flip the _set bit only after the constructor
        finished -- if the constructor would throw, this means we don't call
@@ -576,5 +632,7 @@ template<class T> template<class ...Args> T& Optional<T>::emplace(Args&&... args
 }
 
 }}
+
+#undef _CORRADE_CONTAINERS_OPTIONAL_SANITIZER_ENABLED
 
 #endif
