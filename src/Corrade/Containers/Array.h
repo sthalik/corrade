@@ -379,16 +379,16 @@ class Array {
          * onto the instance to make it useful.
          */
         #ifdef DOXYGEN_GENERATING_OUTPUT
-        /*implicit*/ Array(std::nullptr_t = nullptr) noexcept;
+        constexpr /*implicit*/ Array(std::nullptr_t = nullptr) noexcept;
         #else
         /* To avoid ambiguity either when calling Array{0} or in certain cases
            of passing 0 to overloads that take either an Array or std::size_t.
            See the constructZeroNullPointerAmbiguity() test for more info. FFS,
            zero as null pointer was deprecated in C++11 already, why is this
            still a problem?! */
-        template<class U, typename std::enable_if<std::is_same<std::nullptr_t, U>::value, int>::type = 0> /*implicit*/ Array(U) noexcept: _data{nullptr}, _size{0}, _deleter{} {}
+        template<class U, typename std::enable_if<std::is_same<std::nullptr_t, U>::value, int>::type = 0> constexpr /*implicit*/ Array(U) noexcept: _data{nullptr}, _size{0}, _deleter{} {}
 
-        /*implicit*/ Array() noexcept: _data(nullptr), _size(0), _deleter{} {}
+        constexpr /*implicit*/ Array() noexcept: _data(nullptr), _size(0), _deleter{} {}
         #endif
 
         #ifdef CORRADE_BUILD_DEPRECATED
