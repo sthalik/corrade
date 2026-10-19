@@ -189,15 +189,15 @@ template<class T> class Pointer {
          * @see @ref operator bool(), @ref reset()
          */
         #ifdef DOXYGEN_GENERATING_OUTPUT
-        /*implicit*/ Pointer(std::nullptr_t = nullptr) noexcept;
+        constexpr /*implicit*/ Pointer(std::nullptr_t = nullptr) noexcept;
         #else
         /* To avoid ambiguity in certain cases of passing 0 to overloads that
            take either a Pointer or std::size_t. See the
            constructZeroNullPointerAmbiguity() test for more info. FFS, zero as
            null pointer was deprecated in C++11 already, why is this still a
            problem?! */
-        template<class U, typename std::enable_if<std::is_same<std::nullptr_t, U>::value, int>::type = 0> /*implicit*/ Pointer(U) noexcept: _pointer{} {}
-        /*implicit*/ Pointer() noexcept: _pointer{} {}
+        template<class U, typename std::enable_if<std::is_same<std::nullptr_t, U>::value, int>::type = 0> constexpr /*implicit*/ Pointer(U) noexcept: _pointer{} {}
+        constexpr /*implicit*/ Pointer() noexcept: _pointer{} {}
         #endif
 
         /**
