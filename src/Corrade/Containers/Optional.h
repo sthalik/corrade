@@ -65,6 +65,12 @@ namespace Corrade { namespace Containers {
 
 namespace Implementation {
     template<class, class> struct OptionalConverter;
+
+    /* Copy and move members disabled for T take this, which nothing converts
+       to, not even {}. The copy members the compiler then declares are deleted. */
+    class NotAType {
+        NotAType(const NotAType&);
+    };
 }
 
 /**
@@ -105,9 +111,26 @@ pointer can be compared to @cpp nullptr @ce). The stored object can be accessed
 using @ref operator->(), @ref operator*() or using implicit conversion, while
 attempt to access a stored object in an empty state leads to assertion error.
 
-Unlike @ref std::optional, this class does not provide a @cpp constexpr @ce
-implementation or ordering operators, which makes it fairly simple and
-lightweight. If you need the extra features, use the standard @ref std::optional.
+Unlike @ref std::optional, this class does not provide ordering operators, and
+only the reference specialization is @cpp constexpr @ce, which makes it fairly
+simple and lightweight. If you need the extra features, use the standard
+@ref std::optional.
+
+An @cpp Optional<const T> @ce can be emplaced and reset to @ref NullOpt, but
+not assigned from another optional, same as @ref std::optional.
+
+@section Containers-Optional-references Optional references
+
+An @cpp Optional<T&> @ce stores a pointer that's @cpp nullptr @ce when empty.
+It doesn't bind to temporaries, assignment and @ref emplace() rebind it, and
+it's implicitly constructible from an @cpp Optional<U&> @ce or a reference to
+an @cpp Optional<U> @ce if a @cpp U* @ce is convertible to @cpp T* @ce. The
+latter refers to the value of the @cpp Optional<U> @ce, or is empty if it's
+empty. Optional rvalue references are not allowed.
+
+The @ref optional(T&&) overload is picked even for @cpp optional<int&>(a) @ce
+and returns an @cpp Optional<int> @ce with a copy of @cpp a @ce. Construct an
+@cpp Optional<int&> @ce directly instead.
 
 @section Containers-Optional-stl STL compatibility
 
@@ -167,7 +190,7 @@ template<class T> class Optional {
             #if defined(CORRADE_TARGET_GCC) && !defined(CORRADE_TARGET_CLANG) && __GNUC__ < 5
             Implementation::construct(_value, value);
             #else
-            new(&_value) T{value};
+            new(&_value) typename std::remove_const<T>::type{value};
             #endif
         }
 
@@ -177,14 +200,19 @@ template<class T> class Optional {
          * Moves the passed object to internal storage.
          * @see @ref operator bool(), @ref operator->(), @ref operator*()
          */
-        /*implicit*/ Optional(T&& value) noexcept(std::is_nothrow_move_constructible<T>::value): _set{true} {
+        #ifdef DOXYGEN_GENERATING_OUTPUT
+        /*implicit*/ Optional(T&& value) noexcept(std::is_nothrow_move_constructible<T>::value);
+        #else
+        /* Not T&&, from which a const T could only be copied */
+        /*implicit*/ Optional(typename std::remove_const<T>::type&& value) noexcept(std::is_nothrow_move_constructible<typename std::remove_const<T>::type>::value): _set{true} {
             /* Can't use {}, see the GCC 4.8-specific overload for details */
             #if defined(CORRADE_TARGET_GCC) && !defined(CORRADE_TARGET_CLANG) && __GNUC__ < 5
             Implementation::construct(_value, Utility::move(value));
             #else
-            new(&_value) T{Utility::move(value)};
+            new(&_value) typename std::remove_const<T>::type{Utility::move(value)};
             #endif
         }
+        #endif
 
         /**
          * @brief Construct optional object in-place
@@ -211,10 +239,20 @@ template<class T> class Optional {
          */
         template<class U, class = decltype(Implementation::OptionalConverter<T, U>::from(std::declval<U&&>()))> explicit Optional(U&& other) noexcept(std::is_nothrow_move_constructible<T>::value): Optional{Implementation::OptionalConverter<T, U>::from(Utility::move(other))} {}
 
-        /** @brief Copy constructor */
+        #ifdef DOXYGEN_GENERATING_OUTPUT
+        /**
+         * @brief Copy constructor
+         *
+         * Deleted if @p T isn't copy-constructible.
+         */
         Optional(const Optional<T>& other) noexcept(std::is_nothrow_copy_constructible<T>::value);
 
-        /** @brief Move constructor */
+        /**
+         * @brief Move constructor
+         *
+         * Deleted if @p T isn't move-constructible. A @cpp const @ce value
+         * is copied.
+         */
         Optional(Optional<T>&& other) noexcept(std::is_nothrow_move_constructible<T>::value);
 
         /**
@@ -222,6 +260,7 @@ template<class T> class Optional {
          *
          * If the object already contains a value, calls its destructor.
          * Copy-constructs the value from @p other using placement-new.
+         * Deleted if @p T isn't copy-constructible or is @cpp const @ce.
          */
         Optional<T>& operator=(const Optional<T>& other) noexcept(std::is_nothrow_copy_assignable<T>::value);
 
@@ -231,9 +270,75 @@ template<class T> class Optional {
          * If both objects contain a value, the value is swapped. Otherwise,
          * if the object contains a value, calls its destructor. If @p other
          * contains a value, move-constructs the value from it using placement
-         * new.
+         * new. Deleted if @p T isn't move-constructible or is
+         * @cpp const @ce.
          */
         Optional<T>& operator=(Optional<T>&& other) noexcept(std::is_nothrow_move_assignable<T>::value);
+        #else
+        Optional(typename std::conditional<std::is_copy_constructible<T>::value, const Optional<T>&, const Implementation::NotAType&>::type other) noexcept(std::is_nothrow_copy_constructible<T>::value): _set(other._set) {
+            if(_set)
+                /* Can't use {}, see the GCC 4.8-specific overload for details */
+                #if defined(CORRADE_TARGET_GCC) && !defined(CORRADE_TARGET_CLANG) && __GNUC__ < 5
+                Implementation::construct(_value, other._value);
+                #else
+                new(&_value) typename std::remove_const<T>::type{other._value};
+                #endif
+            else
+                poisonValue();
+        }
+
+        Optional(typename std::conditional<std::is_move_constructible<T>::value, Optional<T>&&, Implementation::NotAType&&>::type other) noexcept(std::is_nothrow_move_constructible<T>::value): _set(other._set) {
+            if(_set)
+                /* Can't use {}, see the GCC 4.8-specific overload for details */
+                #if defined(CORRADE_TARGET_GCC) && !defined(CORRADE_TARGET_CLANG) && __GNUC__ < 5
+                Implementation::construct(_value, Utility::move(static_cast<T&>(other._value)));
+                #else
+                new(&_value) typename std::remove_const<T>::type{Utility::move(static_cast<T&>(other._value))};
+                #endif
+            else
+                poisonValue();
+        }
+
+        Optional<T>& operator=(typename std::conditional<std::is_copy_constructible<T>::value && !std::is_const<T>::value, const Optional<T>&, const Implementation::NotAType&>::type other) noexcept(std::is_nothrow_copy_assignable<T>::value) {
+            if(_set)
+                _value.~T();
+            else
+                unpoisonValue();
+            if((_set = other._set))
+                /* Can't use {}, see the GCC 4.8-specific overload for details */
+                #if defined(CORRADE_TARGET_GCC) && !defined(CORRADE_TARGET_CLANG) && __GNUC__ < 5
+                Implementation::construct(_value, other._value);
+                #else
+                new(&_value) T{other._value};
+                #endif
+            else
+                poisonValue();
+            return *this;
+        }
+
+        Optional<T>& operator=(typename std::conditional<std::is_move_constructible<T>::value && !std::is_const<T>::value, Optional<T>&&, Implementation::NotAType&&>::type other) noexcept(std::is_nothrow_move_assignable<T>::value) {
+            if(_set && other._set) {
+                using Utility::swap;
+                swap(other._value, _value);
+            } else {
+                if(_set)
+                    _value.~T();
+                else
+                    unpoisonValue();
+                if((_set = other._set))
+                    /* Can't use {}, see the GCC 4.8-specific overload for
+                       details */
+                    #if defined(CORRADE_TARGET_GCC) && !defined(CORRADE_TARGET_CLANG) && __GNUC__ < 5
+                    Implementation::construct(_value, Utility::move(other._value));
+                    #else
+                    new(&_value) T{Utility::move(other._value)};
+                    #endif
+                else
+                    poisonValue();
+            }
+            return *this;
+        }
+        #endif
 
         /**
          * @brief Copy-convert the optional to external representation
@@ -369,9 +474,9 @@ template<class T> class Optional {
         /* Not T&& because that'd cause nasty dangling reference issues in
            common code. See the accessRvalueLifetimeExtension() test for
            details. */
-        T operator*() && {
-            CORRADE_DEBUG_ASSERT(_set, "Containers::Optional: the optional is empty", Utility::move(_value));
-            return Utility::move(_value);
+        typename std::remove_const<T>::type operator*() && {
+            CORRADE_DEBUG_ASSERT(_set, "Containers::Optional: the optional is empty", Utility::move(static_cast<T&>(_value)));
+            return Utility::move(static_cast<T&>(_value));
         }
 
         /** @overload */
@@ -397,6 +502,8 @@ template<class T> class Optional {
         template<class ...Args> T& emplace(Args&&... args);
 
     private:
+        template<class> friend class Optional;
+
         /* An empty optional's storage is poisoned if it's at least 8 bytes.
            ASan can poison only the tail of an 8-byte granule, so if _set
            shares the value's last granule, that granule stays readable. */
@@ -415,7 +522,7 @@ template<class T> class Optional {
         #endif
 
         union {
-            T _value;
+            typename std::remove_const<T>::type _value;
             /* GCC 4.8, 7, 9, 10, 11, 12, 13 in Release produces a "warning:
                Optional<T>::<unnamed>.Optional<T>::._anon_34::_value may be
                used uninitialized [-Wmaybe-uninitialized]" at every point an
@@ -465,6 +572,89 @@ template<class T> bool operator==(const T& a, const Optional<T>& b) { return b =
 See @ref Optional::operator!=(const T&) const for more information.
 */
 template<class T> bool operator!=(const T& a, const Optional<T>& b) { return b != a; }
+
+#ifndef DOXYGEN_GENERATING_OUTPUT
+template<class T> class Optional<T&> {
+    public:
+        typedef T& Type;
+
+        constexpr /*implicit*/ Optional(NullOptT = NullOpt) noexcept: _reference{} {}
+
+        constexpr /*implicit*/ Optional(T& value) noexcept: _reference{&value} {}
+
+        Optional(T&&) = delete;
+
+        constexpr /*implicit*/ Optional(Corrade::InPlaceInitT, T& value) noexcept: _reference{&value} {}
+
+        Optional(Corrade::InPlaceInitT, T&&) = delete;
+
+        template<class U, class = typename std::enable_if<std::is_convertible<U*, T*>::value>::type> constexpr /*implicit*/ Optional(const Optional<U&>& other) noexcept: _reference{other._reference} {}
+
+        template<class U, class = typename std::enable_if<!std::is_reference<U>::value && std::is_convertible<U*, T*>::value>::type> constexpr /*implicit*/ Optional(Optional<U>& other) noexcept: _reference{other._set ? &static_cast<U&>(other._value) : nullptr} {}
+
+        template<class U, class = typename std::enable_if<!std::is_reference<U>::value && std::is_convertible<const U*, T*>::value>::type> constexpr /*implicit*/ Optional(const Optional<U>& other) noexcept: _reference{other._set ? &static_cast<const U&>(other._value) : nullptr} {}
+
+        /* The value of an expiring Optional<U> would dangle */
+        template<class U, class = typename std::enable_if<!std::is_reference<U>::value>::type> Optional(const Optional<U>&&) = delete;
+
+        CORRADE_CONSTEXPR14 Optional<T&>& operator=(NullOptT) noexcept {
+            _reference = nullptr;
+            return *this;
+        }
+
+        constexpr explicit operator bool() const { return _reference != nullptr; }
+
+        constexpr bool operator==(const Optional<T&>& other) const {
+            return (!_reference && !other._reference) || (_reference && other._reference && *_reference == *other._reference);
+        }
+
+        constexpr bool operator!=(const Optional<T&>& other) const { return !operator==(other); }
+
+        constexpr bool operator==(NullOptT) const { return !_reference; }
+
+        constexpr bool operator!=(NullOptT) const { return _reference != nullptr; }
+
+        /* For a volatile T, a const T& parameter couldn't bind a temporary */
+        constexpr bool operator==(const typename std::remove_cv<T>::type& other) const {
+            return _reference ? *_reference == other : false;
+        }
+
+        constexpr bool operator!=(const typename std::remove_cv<T>::type& other) const { return !operator==(other); }
+
+        constexpr T* operator->() const {
+            return CORRADE_CONSTEXPR_DEBUG_ASSERT(_reference, "Containers::Optional: the optional is empty"), _reference;
+        }
+
+        constexpr T& operator*() const {
+            return CORRADE_CONSTEXPR_DEBUG_ASSERT(_reference, "Containers::Optional: the optional is empty"), *_reference;
+        }
+
+        CORRADE_CONSTEXPR14 T& emplace(T& value) noexcept {
+            _reference = &value;
+            return value;
+        }
+
+        T& emplace(T&&) = delete;
+
+    private:
+        template<class> friend class Optional;
+
+        T* _reference;
+};
+
+template<class T> class Optional<T&&> {
+    static_assert(!std::is_rvalue_reference<T&&>::value, "Containers::Optional: rvalue references are not supported");
+};
+
+template<class T> constexpr bool operator==(NullOptT, const Optional<T&>& b) { return b == NullOpt; }
+
+template<class T> constexpr bool operator!=(NullOptT, const Optional<T&>& b) { return b != NullOpt; }
+
+/* The overloads above can't deduce T from a value and an Optional<T&> */
+template<class T> constexpr bool operator==(const typename std::remove_cv<T>::type& a, const Optional<T&>& b) { return b == a; }
+
+template<class T> constexpr bool operator!=(const typename std::remove_cv<T>::type& a, const Optional<T&>& b) { return b != a; }
+#endif
 
 namespace Implementation {
     /* The default implementation has a Type member, but the user-provided
@@ -542,69 +732,6 @@ template<class T> Utility::Debug& operator<<(Utility::Debug& debug, const Option
 }
 #endif
 
-template<class T> Optional<T>::Optional(const Optional<T>& other) noexcept(std::is_nothrow_copy_constructible<T>::value): _set(other._set) {
-    if(_set)
-        /* Can't use {}, see the GCC 4.8-specific overload for details */
-        #if defined(CORRADE_TARGET_GCC) && !defined(CORRADE_TARGET_CLANG) && __GNUC__ < 5
-        Implementation::construct(_value, other._value);
-        #else
-        new(&_value) T{other._value};
-        #endif
-    else
-        poisonValue();
-}
-
-template<class T> Optional<T>::Optional(Optional<T>&& other) noexcept(std::is_nothrow_move_constructible<T>::value): _set(other._set) {
-    if(_set)
-        /* Can't use {}, see the GCC 4.8-specific overload for details */
-        #if defined(CORRADE_TARGET_GCC) && !defined(CORRADE_TARGET_CLANG) && __GNUC__ < 5
-        Implementation::construct(_value, Utility::move(other._value));
-        #else
-        new(&_value) T{Utility::move(other._value)};
-        #endif
-    else
-        poisonValue();
-}
-
-template<class T> Optional<T>& Optional<T>::operator=(const Optional<T>& other) noexcept(std::is_nothrow_copy_assignable<T>::value) {
-    if(_set)
-        _value.~T();
-    else
-        unpoisonValue();
-    if((_set = other._set))
-        /* Can't use {}, see the GCC 4.8-specific overload for details */
-        #if defined(CORRADE_TARGET_GCC) && !defined(CORRADE_TARGET_CLANG) && __GNUC__ < 5
-        Implementation::construct(_value, other._value);
-        #else
-        new(&_value) T{other._value};
-        #endif
-    else
-        poisonValue();
-    return *this;
-}
-
-template<class T> Optional<T>& Optional<T>::operator=(Optional<T>&& other) noexcept(std::is_nothrow_move_assignable<T>::value) {
-    if(_set && other._set) {
-        using Utility::swap;
-        swap(other._value, _value);
-    } else {
-        if(_set)
-            _value.~T();
-        else
-            unpoisonValue();
-        if((_set = other._set))
-            /* Can't use {}, see the GCC 4.8-specific overload for details */
-            #if defined(CORRADE_TARGET_GCC) && !defined(CORRADE_TARGET_CLANG) && __GNUC__ < 5
-            Implementation::construct(_value, Utility::move(other._value));
-            #else
-            new(&_value) T{Utility::move(other._value)};
-            #endif
-        else
-            poisonValue();
-    }
-    return *this;
-}
-
 template<class T> Optional<T>& Optional<T>::operator=(NullOptT) noexcept {
     if(_set) {
         _value.~T();
@@ -621,7 +748,7 @@ template<class T> template<class ...Args> T& Optional<T>::emplace(Args&&... args
         _value.~T();
     else
         unpoisonValue();
-    Implementation::construct<T>(_value, Utility::forward<Args>(args)...);
+    Implementation::construct<typename std::remove_const<T>::type>(_value, Utility::forward<Args>(args)...);
     /* For exception safety flip the _set bit only after the constructor
        finished -- if the constructor would throw, this means we don't call
        a destructor on a partially-constructed instance, which would most

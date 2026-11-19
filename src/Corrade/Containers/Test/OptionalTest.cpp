@@ -157,6 +157,21 @@ struct OptionalTest: TestSuite::Tester {
     void copyConstructPlainStruct();
     void moveConstructPlainStruct();
     void vectorOfMovableOptional();
+
+    void constructConst();
+    void emplaceConst();
+
+    void constructReference();
+    void constructReferenceConstexpr();
+    void constructReferenceFromReference();
+    void constructReferenceFromValue();
+    void assignReference();
+    void emplaceReference();
+    void compareReference();
+    void accessReference();
+    void accessReferenceVolatile();
+    void accessReferenceInvalid();
+    void debugReference();
 };
 
 OptionalTest::OptionalTest() {
@@ -219,6 +234,21 @@ OptionalTest::OptionalTest() {
               &OptionalTest::copyConstructPlainStruct,
               &OptionalTest::moveConstructPlainStruct,
               &OptionalTest::vectorOfMovableOptional});
+
+    addTests({&OptionalTest::constructConst,
+              &OptionalTest::emplaceConst}, &OptionalTest::resetCounters, &OptionalTest::resetCounters);
+
+    addTests({&OptionalTest::constructReference,
+              &OptionalTest::constructReferenceConstexpr,
+              &OptionalTest::constructReferenceFromReference,
+              &OptionalTest::constructReferenceFromValue,
+              &OptionalTest::assignReference,
+              &OptionalTest::emplaceReference,
+              &OptionalTest::compareReference,
+              &OptionalTest::accessReference,
+              &OptionalTest::accessReferenceVolatile,
+              &OptionalTest::accessReferenceInvalid,
+              &OptionalTest::debugReference});
 }
 
 void OptionalTest::nullOptNoDefaultConstructor() {
@@ -418,11 +448,8 @@ void OptionalTest::constructMove() {
 
     CORRADE_VERIFY(!std::is_copy_constructible<Movable>::value);
     CORRADE_VERIFY(!std::is_copy_assignable<Movable>::value);
-    {
-        CORRADE_EXPECT_FAIL("Optional currently doesn't propagate deleted copy constructor/assignment correctly.");
-        CORRADE_VERIFY(!std::is_copy_constructible<Optional<Movable>>::value);
-        CORRADE_VERIFY(!std::is_copy_assignable<Optional<Movable>>::value);
-    }
+    CORRADE_VERIFY(!std::is_copy_constructible<Optional<Movable>>::value);
+    CORRADE_VERIFY(!std::is_copy_assignable<Optional<Movable>>::value);
 
     CORRADE_VERIFY(std::is_nothrow_move_constructible<Movable>::value);
     CORRADE_VERIFY(std::is_nothrow_move_constructible<Optional<Movable>>::value);
@@ -470,13 +497,10 @@ void OptionalTest::constructInPlace() {
     CORRADE_VERIFY(!std::is_move_constructible<Immovable>::value);
     CORRADE_VERIFY(!std::is_copy_assignable<Immovable>::value);
     CORRADE_VERIFY(!std::is_move_assignable<Immovable>::value);
-    {
-        CORRADE_EXPECT_FAIL("Optional currently doesn't propagate deleted copy/move constructor/assignment correctly.");
-        CORRADE_VERIFY(!std::is_copy_constructible<Optional<Immovable>>::value);
-        CORRADE_VERIFY(!std::is_move_constructible<Optional<Immovable>>::value);
-        CORRADE_VERIFY(!std::is_copy_assignable<Optional<Immovable>>::value);
-        CORRADE_VERIFY(!std::is_move_assignable<Optional<Immovable>>::value);
-    }
+    CORRADE_VERIFY(!std::is_copy_constructible<Optional<Immovable>>::value);
+    CORRADE_VERIFY(!std::is_move_constructible<Optional<Immovable>>::value);
+    CORRADE_VERIFY(!std::is_copy_assignable<Optional<Immovable>>::value);
+    CORRADE_VERIFY(!std::is_move_assignable<Optional<Immovable>>::value);
 
     CORRADE_VERIFY(std::is_nothrow_constructible<Optional<Immovable>, Corrade::InPlaceInitT, int, int&&>::value);
     CORRADE_VERIFY(std::is_constructible<Optional<Throwable>, Corrade::InPlaceInitT, int>::value);
@@ -1162,6 +1186,325 @@ void OptionalTest::vectorOfMovableOptional() {
     CORRADE_VERIFY(!vec[1]);
     CORRADE_VERIFY(!vec[2]);
     CORRADE_COMPARE(vec[3]->a, 67);
+}
+
+void OptionalTest::constructConst() {
+    {
+        Optional<const Copyable> a{Copyable{32}};
+        CORRADE_VERIFY(a);
+        CORRADE_COMPARE(a->a, 32);
+
+        Optional<const Copyable> b = a;
+        CORRADE_COMPARE(b->a, 32);
+
+        /* A const value can't be moved from, so it's copied */
+        Optional<const Copyable> c = Utility::move(a);
+        CORRADE_VERIFY(a);
+        CORRADE_COMPARE(a->a, 32);
+        CORRADE_COMPARE(c->a, 32);
+
+        Copyable d = *Utility::move(c);
+        CORRADE_COMPARE(d.a, 32);
+    }
+
+    /* Only the temporary got moved */
+    CORRADE_COMPARE(Copyable::constructed, 5);
+    CORRADE_COMPARE(Copyable::destructed, 5);
+    CORRADE_COMPARE(Copyable::copied, 3);
+    CORRADE_COMPARE(Copyable::moved, 1);
+
+    CORRADE_VERIFY(std::is_same<decltype(std::declval<Optional<const Copyable>&>().operator->()), const Copyable*>::value);
+    CORRADE_VERIFY(std::is_same<decltype(*std::declval<Optional<const Copyable>&>()), const Copyable&>::value);
+    CORRADE_VERIFY(std::is_same<decltype(*std::declval<Optional<const Copyable>>()), Copyable>::value);
+
+    CORRADE_VERIFY(std::is_nothrow_copy_constructible<Optional<const Copyable>>::value);
+    CORRADE_VERIFY(std::is_nothrow_move_constructible<Optional<const Copyable>>::value);
+    CORRADE_VERIFY(!std::is_copy_assignable<Optional<const Copyable>>::value);
+    CORRADE_VERIFY(!std::is_move_assignable<Optional<const Copyable>>::value);
+    CORRADE_VERIFY(!std::is_assignable<Optional<const Copyable>&, const Copyable&>::value);
+    CORRADE_VERIFY(!std::is_copy_constructible<Optional<const Movable>>::value);
+    CORRADE_VERIFY(!std::is_move_constructible<Optional<const Movable>>::value);
+}
+
+void OptionalTest::emplaceConst() {
+    {
+        Optional<const Copyable> a;
+        a.emplace(32);
+        CORRADE_COMPARE(a->a, 32);
+
+        const Copyable& b = a.emplace(15);
+        CORRADE_COMPARE(b.a, 15);
+        CORRADE_VERIFY(&b == &*a);
+
+        a = NullOpt;
+        CORRADE_VERIFY(!a);
+    }
+
+    CORRADE_COMPARE(Copyable::constructed, 2);
+    CORRADE_COMPARE(Copyable::destructed, 2);
+    CORRADE_COMPARE(Copyable::copied, 0);
+    CORRADE_COMPARE(Copyable::moved, 0);
+}
+
+constexpr int ReferencedValue = 47;
+
+void OptionalTest::constructReference() {
+    int x = 5;
+    Optional<int&> a;
+    Optional<int&> b = NullOpt;
+    Optional<int&> c = x;
+    Optional<int&> d{Corrade::InPlaceInit, x};
+    CORRADE_VERIFY(!a);
+    CORRADE_VERIFY(!b);
+    CORRADE_VERIFY(c);
+    CORRADE_VERIFY(d);
+    CORRADE_VERIFY(&*c == &x);
+    CORRADE_VERIFY(&*d == &x);
+    CORRADE_VERIFY(c.operator->() == &x);
+
+    Optional<int&> e = c;
+    CORRADE_VERIFY(&*e == &x);
+
+    CORRADE_VERIFY(std::is_same<Optional<int&>::Type, int&>::value);
+    CORRADE_COMPARE(sizeof(Optional<int&>), sizeof(int*));
+    #ifndef CORRADE_NO_STD_IS_TRIVIALLY_TRAITS
+    CORRADE_VERIFY(std::is_trivially_copyable<Optional<const int&>>::value);
+    #endif
+    CORRADE_VERIFY(std::is_nothrow_default_constructible<Optional<int&>>::value);
+    CORRADE_VERIFY(std::is_nothrow_constructible<Optional<int&>, int&>::value);
+    CORRADE_VERIFY(std::is_nothrow_constructible<Optional<int&>, Corrade::InPlaceInitT, int&>::value);
+
+    /* Binding a temporary would dangle */
+    CORRADE_VERIFY(!std::is_constructible<Optional<const int&>, int>::value);
+    CORRADE_VERIFY(!std::is_constructible<Optional<const int&>, Corrade::InPlaceInitT, int>::value);
+    CORRADE_VERIFY(!std::is_constructible<Optional<int&>, const int&>::value);
+}
+
+void OptionalTest::constructReferenceConstexpr() {
+    constexpr Optional<const int&> a;
+    constexpr Optional<const int&> b = NullOpt;
+    constexpr Optional<const int&> c = ReferencedValue;
+    constexpr Optional<const int&> d{Corrade::InPlaceInit, ReferencedValue};
+    constexpr Optional<const int&> e = c;
+    constexpr Optional<const volatile int&> f = c;
+
+    constexpr bool isASet = !!a;
+    constexpr bool isCSet = !!c;
+    constexpr const int* pointerC = c.operator->();
+    constexpr const volatile int* pointerF = f.operator->();
+    constexpr int valueD = *d;
+    constexpr bool isEqual = c == d && c == e && c == 47 && 47 == c && a == b && a == NullOpt && NullOpt == a;
+    constexpr bool isNotEqual = c != a && c != 46 && 46 != c && c != NullOpt && NullOpt != c && !(c != d);
+    CORRADE_VERIFY(!isASet);
+    CORRADE_VERIFY(isCSet);
+    CORRADE_VERIFY(pointerC == &ReferencedValue);
+    CORRADE_VERIFY(pointerF == &ReferencedValue);
+    CORRADE_COMPARE(valueD, 47);
+    CORRADE_VERIFY(isEqual);
+    CORRADE_VERIFY(isNotEqual);
+}
+
+void OptionalTest::constructReferenceFromReference() {
+    struct Base { int a; };
+    struct Derived: Base {};
+
+    int x = 5;
+    Optional<int&> a = x;
+    Optional<const int&> b = a;
+    Optional<volatile int&> c = a;
+    Optional<const volatile int&> d = b;
+    CORRADE_VERIFY(&*b == &x);
+    CORRADE_VERIFY(c.operator->() == &x);
+    CORRADE_VERIFY(d.operator->() == &x);
+
+    Optional<int&> empty;
+    Optional<const int&> e = empty;
+    CORRADE_VERIFY(!e);
+
+    Derived derived;
+    Optional<Derived&> f = derived;
+    Optional<Base&> g = f;
+    CORRADE_VERIFY(&*g == &derived);
+
+    CORRADE_VERIFY(std::is_nothrow_constructible<Optional<const int&>, const Optional<int&>&>::value);
+    CORRADE_VERIFY(!std::is_convertible<Optional<const int&>, Optional<int&>>::value);
+    CORRADE_VERIFY(!std::is_convertible<Optional<volatile int&>, Optional<int&>>::value);
+    CORRADE_VERIFY(!std::is_convertible<Optional<Base&>, Optional<Derived&>>::value);
+    CORRADE_VERIFY(!std::is_convertible<Optional<int&>, Optional<float&>>::value);
+}
+
+void OptionalTest::constructReferenceFromValue() {
+    struct Base { int a; };
+    struct Derived: Base {};
+
+    Optional<int> a{5};
+    const Optional<int> ca{6};
+    Optional<const int> constA{7};
+    Optional<int> empty;
+
+    Optional<int&> b = a;
+    Optional<const int&> c = a;
+    Optional<const int&> d = ca;
+    Optional<const int&> e = constA;
+    Optional<int&> f = empty;
+    CORRADE_VERIFY(&*b == &*a);
+    CORRADE_VERIFY(&*c == &*a);
+    CORRADE_VERIFY(&*d == &*ca);
+    CORRADE_VERIFY(&*e == &*constA);
+    CORRADE_VERIFY(!f);
+
+    *b = 15;
+    CORRADE_COMPARE(*a, 15);
+
+    Optional<Derived> derived{Corrade::InPlaceInit};
+    Optional<Base&> g = derived;
+    CORRADE_VERIFY(&*g == &*derived);
+
+    CORRADE_VERIFY(std::is_nothrow_constructible<Optional<int&>, Optional<int>&>::value);
+    CORRADE_VERIFY(std::is_nothrow_constructible<Optional<const int&>, const Optional<int>&>::value);
+    CORRADE_VERIFY(!std::is_constructible<Optional<int&>, const Optional<int>&>::value);
+    CORRADE_VERIFY(!std::is_constructible<Optional<int&>, Optional<const int>&>::value);
+    CORRADE_VERIFY(!std::is_constructible<Optional<int&>, Optional<float>&>::value);
+
+    /* The value of an expiring optional would dangle */
+    CORRADE_VERIFY(!std::is_constructible<Optional<const int&>, Optional<int>>::value);
+    CORRADE_VERIFY(!std::is_constructible<Optional<const int&>, const Optional<int>&&>::value);
+}
+
+void OptionalTest::assignReference() {
+    int x = 5;
+    int y = 6;
+    Optional<int&> a = x;
+    Optional<int&> b = y;
+
+    /* Rebinds, keeping the values as they were */
+    a = b;
+    CORRADE_VERIFY(&*a == &y);
+    CORRADE_COMPARE(x, 5);
+    CORRADE_COMPARE(y, 6);
+
+    a = x;
+    CORRADE_VERIFY(&*a == &x);
+    CORRADE_COMPARE(y, 6);
+
+    Optional<int> c{7};
+    a = c;
+    CORRADE_VERIFY(&*a == &*c);
+
+    a = NullOpt;
+    CORRADE_VERIFY(!a);
+
+    a = x;
+    a = {};
+    CORRADE_VERIFY(!a);
+
+    CORRADE_VERIFY(std::is_nothrow_copy_assignable<Optional<int&>>::value);
+    CORRADE_VERIFY(std::is_nothrow_assignable<Optional<int&>, NullOptT>::value);
+    CORRADE_VERIFY(!std::is_assignable<Optional<const int&>&, int>::value);
+    CORRADE_VERIFY(!std::is_assignable<Optional<const int&>&, Optional<int>>::value);
+}
+
+void OptionalTest::emplaceReference() {
+    int x = 5;
+    int y = 6;
+    Optional<int&> a;
+
+    int& b = a.emplace(x);
+    CORRADE_VERIFY(&b == &x);
+    CORRADE_VERIFY(&*a == &x);
+
+    a.emplace(y);
+    CORRADE_VERIFY(&*a == &y);
+    CORRADE_COMPARE(x, 5);
+}
+
+void OptionalTest::compareReference() {
+    int x = 5;
+    int y = 5;
+    int z = 6;
+    Optional<const int&> a = x;
+    Optional<const int&> b = y;
+    Optional<const int&> c = z;
+    Optional<const int&> empty;
+
+    /* Values are compared, not addresses */
+    CORRADE_VERIFY(a == b);
+    CORRADE_VERIFY(!(a != b));
+    CORRADE_VERIFY(a != c);
+    CORRADE_VERIFY(a != empty);
+    CORRADE_VERIFY(empty == Optional<const int&>{});
+
+    CORRADE_VERIFY(a == 5);
+    CORRADE_VERIFY(5 == a);
+    CORRADE_VERIFY(a != 6);
+    CORRADE_VERIFY(6 != a);
+    CORRADE_VERIFY(empty != 5);
+    CORRADE_VERIFY(5 != empty);
+
+    CORRADE_VERIFY(a != NullOpt);
+    CORRADE_VERIFY(NullOpt != a);
+    CORRADE_VERIFY(empty == NullOpt);
+    CORRADE_VERIFY(NullOpt == empty);
+}
+
+void OptionalTest::accessReference() {
+    struct Foo { int a; };
+
+    Foo foo{32};
+    /* Constness of the optional doesn't affect the value */
+    const Optional<Foo&> a = foo;
+    a->a = 15;
+    CORRADE_COMPARE(foo.a, 15);
+    (*a).a = 7;
+    CORRADE_COMPARE(foo.a, 7);
+
+    CORRADE_VERIFY(std::is_same<decltype(*a), Foo&>::value);
+    CORRADE_VERIFY(std::is_same<decltype(a.operator->()), Foo*>::value);
+    CORRADE_VERIFY(std::is_same<decltype(*std::declval<Optional<const Foo&>>()), const Foo&>::value);
+}
+
+void OptionalTest::accessReferenceVolatile() {
+    int x = 5;
+    Optional<volatile int&> a = x;
+    *a = 7;
+    CORRADE_COMPARE(x, 7);
+    CORRADE_VERIFY(a.operator->() == &x);
+    CORRADE_VERIFY(a == 7);
+    CORRADE_VERIFY(7 == a);
+    CORRADE_VERIFY(a != 6);
+    CORRADE_VERIFY(6 != a);
+
+    const volatile int& cx = x;
+    Optional<const volatile int&> b = cx;
+    Optional<const volatile int&> c = a;
+    CORRADE_VERIFY(b.operator->() == &x);
+    CORRADE_VERIFY(b == 7);
+    CORRADE_VERIFY(7 == b);
+    CORRADE_VERIFY(b == c);
+}
+
+void OptionalTest::accessReferenceInvalid() {
+    CORRADE_SKIP_IF_NO_DEBUG_ASSERT();
+
+    Optional<int&> a;
+    CORRADE_VERIFY(!a);
+
+    Containers::String out;
+    {
+        Error redirectError{&out};
+        a.operator->();
+        *a;
+    }
+    CORRADE_COMPARE(out,
+        "Containers::Optional: the optional is empty\n"
+        "Containers::Optional: the optional is empty\n");
+}
+
+void OptionalTest::debugReference() {
+    int x = 42;
+    Containers::String out;
+    Debug{&out} << Optional<int&>{x} << Optional<const int&>{} << Optional<const volatile int&>{x};
+    CORRADE_COMPARE(out, "42 Containers::NullOpt 42\n");
 }
 
 }}}}
