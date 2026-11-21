@@ -104,17 +104,17 @@ void copy(const Containers::StridedArrayView4D<const char>& src, const Container
         if(src.isContiguous<1>() && dst.isContiguous<1>()) {
             const std::size_t size123 = size[1]*size[2]*size[3];
             for(std::size_t i = 0; i != size[0]; ++i)
-                std::memcpy(dstPtr + i*dstStride[0],
-                            srcPtr + i*srcStride[0], size123);
+                std::memcpy(dstPtr + std::ptrdiff_t(i)*dstStride[0],
+                            srcPtr + std::ptrdiff_t(i)*srcStride[0], size123);
         } else {
             if(src.isContiguous<2>() && dst.isContiguous<2>()) {
                 const std::size_t size23 = size[2]*size[3];
                 for(std::size_t i0 = 0; i0 != size[0]; ++i0) {
-                    const char* srcPtr0 = srcPtr + i0*srcStride[0];
-                    char* dstPtr0 = dstPtr + i0*dstStride[0];
+                    const char* srcPtr0 = srcPtr + std::ptrdiff_t(i0)*srcStride[0];
+                    char* dstPtr0 = dstPtr + std::ptrdiff_t(i0)*dstStride[0];
                     for(std::size_t i1 = 0; i1 != size[1]; ++i1)
-                        std::memcpy(dstPtr0 + i1*dstStride[1],
-                                    srcPtr0 + i1*srcStride[1], size23);
+                        std::memcpy(dstPtr0 + std::ptrdiff_t(i1)*dstStride[1],
+                                    srcPtr0 + std::ptrdiff_t(i1)*srcStride[1], size23);
                 }
             } else {
                 /* On Clang, for smaller sizes in the last dimension we prefer
@@ -133,31 +133,31 @@ void copy(const Containers::StridedArrayView4D<const char>& src, const Container
                    acceptable). OTOH, GCC is slower with Duff in both Debug and Release, so there we use the loop instead. */
                 if(src.isContiguous<3>() && dst.isContiguous<3>() && size[3] >= 8) {
                     for(std::size_t i0 = 0; i0 != size[0]; ++i0) {
-                        const char* srcPtr0 = srcPtr + i0*srcStride[0];
-                        char* dstPtr0 = dstPtr + i0*dstStride[0];
+                        const char* srcPtr0 = srcPtr + std::ptrdiff_t(i0)*srcStride[0];
+                        char* dstPtr0 = dstPtr + std::ptrdiff_t(i0)*dstStride[0];
                         for(std::size_t i1 = 0; i1 != size[1]; ++i1) {
-                            const char* srcPtr1 = srcPtr0 + i1*srcStride[1];
-                            char* dstPtr1 = dstPtr0 + i1*dstStride[1];
+                            const char* srcPtr1 = srcPtr0 + std::ptrdiff_t(i1)*srcStride[1];
+                            char* dstPtr1 = dstPtr0 + std::ptrdiff_t(i1)*dstStride[1];
                             for(std::size_t i2 = 0; i2 != size[2]; ++i2)
-                                std::memcpy(dstPtr1 + i2*dstStride[2],
-                                            srcPtr1 + i2*srcStride[2], size[3]);
+                                std::memcpy(dstPtr1 + std::ptrdiff_t(i2)*dstStride[2],
+                                            srcPtr1 + std::ptrdiff_t(i2)*srcStride[2], size[3]);
                         }
                     }
                 } else {
                     for(std::size_t i0 = 0; i0 != size[0]; ++i0) {
-                        const char* srcPtr0 = srcPtr + i0*srcStride[0];
-                        char* dstPtr0 = dstPtr + i0*dstStride[0];
+                        const char* srcPtr0 = srcPtr + std::ptrdiff_t(i0)*srcStride[0];
+                        char* dstPtr0 = dstPtr + std::ptrdiff_t(i0)*dstStride[0];
                         for(std::size_t i1 = 0; i1 != size[1]; ++i1) {
-                            const char* srcPtr1 = srcPtr0 + i1*srcStride[1];
-                            char* dstPtr1 = dstPtr0 + i1*dstStride[1];
+                            const char* srcPtr1 = srcPtr0 + std::ptrdiff_t(i1)*srcStride[1];
+                            char* dstPtr1 = dstPtr0 + std::ptrdiff_t(i1)*dstStride[1];
                             for(std::size_t i2 = 0; i2 != size[2]; ++i2) {
-                                const char* srcPtr2 = srcPtr1 + i2*srcStride[2];
-                                char* dstPtr2 = dstPtr1 + i2*dstStride[2];
+                                const char* srcPtr2 = srcPtr1 + std::ptrdiff_t(i2)*srcStride[2];
+                                char* dstPtr2 = dstPtr1 + std::ptrdiff_t(i2)*dstStride[2];
 
                                 #if !defined(CORRADE_TARGET_CLANG)
                                 for(std::size_t i3 = 0; i3 != size[3]; ++i3)
-                                    *(dstPtr2 + i3*dstStride[3]) =
-                                        *(srcPtr2 + i3*srcStride[3]);
+                                    *(dstPtr2 + std::ptrdiff_t(i3)*dstStride[3]) =
+                                        *(srcPtr2 + std::ptrdiff_t(i3)*srcStride[3]);
                                 #else
                                 std::size_t n = (size[3] + 7)/8;
                                 switch(size[3]%8) {
@@ -238,15 +238,15 @@ void flipSecondToLastDimensionInPlace(const Containers::StridedArrayView4D<char>
     const std::ptrdiff_t* stride = view.stride().begin();
 
     for(std::size_t i0 = 0; i0 != size[0]; ++i0) {
-        char* const ptr0 = ptr + i0*stride[0];
+        char* const ptr0 = ptr + std::ptrdiff_t(i0)*stride[0];
         for(std::size_t i1 = 0; i1 != size[1]; ++i1) {
-            char* const ptr1 = ptr0 + i1*stride[1];
+            char* const ptr1 = ptr0 + std::ptrdiff_t(i1)*stride[1];
 
             /* Go through half of the items in third dimension and flip them
                with the other half */
             for(std::size_t i2 = 0, i2Max = size[2]/2; i2 != i2Max; ++i2) {
-                char* const ptr2Left = ptr1 + i2*stride[2];
-                char* const ptr2Right = ptr1 + (size[2] - i2 - 1)*stride[2];
+                char* const ptr2Left = ptr1 + std::ptrdiff_t(i2)*stride[2];
+                char* const ptr2Right = ptr1 + std::ptrdiff_t(size[2] - i2 - 1)*stride[2];
 
                 /* Copy 256-bit blocks at a time, which could hopefully make
                    use of 256-bit SIMD */
