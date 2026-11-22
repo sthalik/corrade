@@ -55,7 +55,8 @@
 #endif
 
 #if defined(CORRADE_TARGET_WINDOWS) && !defined(CORRADE_TARGET_WINDOWS_RT)
-/* Needed for SetCurrentDirectoryW() in currentDirectoryExtendedLength() */
+/* Needed for SetCurrentDirectoryW() in currentDirectoryExtendedLength() and
+   LockFileEx() in FileLock */
 #include "Corrade/Utility/Unicode.h"
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -69,6 +70,29 @@ namespace Corrade { namespace Utility { namespace Test { namespace {
 
 /* In a static build this can run before Corrade's own global constructors */
 const Containers::Optional<Containers::String> CurrentDirectoryFromGlobalConstructor = Path::currentDirectory();
+
+#if defined(CORRADE_TARGET_WINDOWS) && !defined(CORRADE_TARGET_WINDOWS_RT)
+/* Locks the whole file through a handle of its own. Reads and writes through
+   any other handle then fail. */
+struct FileLock {
+    explicit FileLock(const Containers::StringView filename): handle{CreateFileW(Unicode::widen(filename).data(), GENERIC_READ|GENERIC_WRITE, FILE_SHARE_READ|FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr)} {
+        OVERLAPPED overlapped{};
+        isLocked = handle != INVALID_HANDLE_VALUE && LockFileEx(handle, LOCKFILE_EXCLUSIVE_LOCK|LOCKFILE_FAIL_IMMEDIATELY, 0, MAXDWORD, MAXDWORD, &overlapped);
+    }
+
+    FileLock(const FileLock&) = delete;
+
+    ~FileLock() {
+        if(handle != INVALID_HANDLE_VALUE)
+            CloseHandle(handle);
+    }
+
+    FileLock& operator=(const FileLock&) = delete;
+
+    HANDLE handle;
+    bool isLocked;
+};
+#endif
 
 struct PathTest: TestSuite::Tester {
     explicit PathTest();
@@ -214,6 +238,7 @@ struct PathTest: TestSuite::Tester {
     void writeEmpty();
     void writeDirectory();
     void writeNoPermission();
+    void writeIoError();
     void writeNonNullTerminated();
     void writeUtf8();
 
@@ -223,6 +248,7 @@ struct PathTest: TestSuite::Tester {
     void appendEmpty();
     void appendDirectory();
     void appendNoPermission();
+    void appendIoError();
     void appendNonNullTerminated();
     void appendUtf8();
 
@@ -231,7 +257,9 @@ struct PathTest: TestSuite::Tester {
     void copyEmpty();
     void copyDirectory();
     void copyReadNonexistent();
+    void copyReadIoError();
     void copyWriteNoPermission();
+    void copyWriteIoError();
     void copyNonNullTerminated();
     void copyUtf8();
 
@@ -770,6 +798,7 @@ PathTest::PathTest() {
               &PathTest::writeEmpty,
               &PathTest::writeDirectory,
               &PathTest::writeNoPermission,
+              &PathTest::writeIoError,
               &PathTest::writeNonNullTerminated,
               &PathTest::writeUtf8,
 
@@ -779,6 +808,7 @@ PathTest::PathTest() {
               &PathTest::appendEmpty,
               &PathTest::appendDirectory,
               &PathTest::appendNoPermission,
+              &PathTest::appendIoError,
               &PathTest::appendNonNullTerminated,
               &PathTest::appendUtf8});
 
@@ -789,7 +819,9 @@ PathTest::PathTest() {
     addTests({&PathTest::copyEmpty,
               &PathTest::copyDirectory,
               &PathTest::copyReadNonexistent,
-              &PathTest::copyWriteNoPermission});
+              &PathTest::copyReadIoError,
+              &PathTest::copyWriteNoPermission,
+              &PathTest::copyWriteIoError});
 
     addTests({&PathTest::copyNonNullTerminated},
         &PathTest::prepareFileToCopy,
@@ -3403,6 +3435,43 @@ void PathTest::writeNoPermission() {
     #endif
 }
 
+void PathTest::writeIoError() {
+    #if defined(CORRADE_TARGET_WINDOWS) && !defined(CORRADE_TARGET_WINDOWS_RT)
+    CORRADE_VERIFY(Path::make(_writeTestDir));
+    const Containers::String filename = Path::join(_writeTestDir, "locked");
+    CORRADE_VERIFY(Path::write(filename, "a"_s));
+    FileLock lock{filename};
+    CORRADE_VERIFY(lock.isLocked);
+    #elif defined(__linux__) && !defined(CORRADE_TARGET_EMSCRIPTEN)
+    /* Every write to it fails with ENOSPC */
+    const Containers::String filename = "/dev/full"_s;
+    #else
+    const Containers::String filename;
+    CORRADE_SKIP("Not sure how to test on this system.");
+    #endif
+
+    /* Stays buffered until fclose() */
+    {
+        Containers::String out;
+        Error redirectError{&out};
+        CORRADE_VERIFY(!Path::write(filename, "hello"_s));
+        CORRADE_COMPARE_AS(out,
+            format("Utility::Path::write(): can't write to {}: error ", filename),
+            TestSuite::Compare::StringHasPrefix);
+    }
+
+    /* Larger than the buffer, so fwrite() itself fails */
+    {
+        const Containers::Array<char> data{ValueInit, 1024*1024};
+        Containers::String out;
+        Error redirectError{&out};
+        CORRADE_VERIFY(!Path::write(filename, data));
+        CORRADE_COMPARE_AS(out,
+            format("Utility::Path::write(): can't write to {}: error ", filename),
+            TestSuite::Compare::StringHasPrefix);
+    }
+}
+
 void PathTest::writeNonNullTerminated() {
     CORRADE_VERIFY(Path::make(_writeTestDir));
 
@@ -3557,6 +3626,43 @@ void PathTest::appendNoPermission() {
         format("Utility::Path::append(): can't open {}: error 13 (", filename),
         TestSuite::Compare::StringHasPrefix);
     #endif
+}
+
+void PathTest::appendIoError() {
+    #if defined(CORRADE_TARGET_WINDOWS) && !defined(CORRADE_TARGET_WINDOWS_RT)
+    CORRADE_VERIFY(Path::make(_writeTestDir));
+    const Containers::String filename = Path::join(_writeTestDir, "locked");
+    CORRADE_VERIFY(Path::write(filename, "a"_s));
+    FileLock lock{filename};
+    CORRADE_VERIFY(lock.isLocked);
+    #elif defined(__linux__) && !defined(CORRADE_TARGET_EMSCRIPTEN)
+    /* Every write to it fails with ENOSPC */
+    const Containers::String filename = "/dev/full"_s;
+    #else
+    const Containers::String filename;
+    CORRADE_SKIP("Not sure how to test on this system.");
+    #endif
+
+    /* Stays buffered until fclose() */
+    {
+        Containers::String out;
+        Error redirectError{&out};
+        CORRADE_VERIFY(!Path::append(filename, "hello"_s));
+        CORRADE_COMPARE_AS(out,
+            format("Utility::Path::append(): can't write to {}: error ", filename),
+            TestSuite::Compare::StringHasPrefix);
+    }
+
+    /* Larger than the buffer, so fwrite() itself fails */
+    {
+        const Containers::Array<char> data{ValueInit, 1024*1024};
+        Containers::String out;
+        Error redirectError{&out};
+        CORRADE_VERIFY(!Path::append(filename, data));
+        CORRADE_COMPARE_AS(out,
+            format("Utility::Path::append(): can't write to {}: error ", filename),
+            TestSuite::Compare::StringHasPrefix);
+    }
 }
 
 void PathTest::appendNonNullTerminated() {
@@ -3750,6 +3856,57 @@ void PathTest::copyWriteNoPermission() {
         format("Utility::Path::copy(): can't open {} for writing: error 13 (", filename),
         TestSuite::Compare::StringHasPrefix);
     #endif
+}
+
+void PathTest::copyReadIoError() {
+    #if defined(CORRADE_TARGET_WINDOWS) && !defined(CORRADE_TARGET_WINDOWS_RT)
+    CORRADE_VERIFY(Path::make(_writeTestDir));
+    const Containers::String from = Path::join(_writeTestDir, "locked");
+    CORRADE_VERIFY(Path::write(from, "hello"_s));
+    FileLock lock{from};
+    CORRADE_VERIFY(lock.isLocked);
+    #elif defined(__linux__) && !defined(CORRADE_TARGET_EMSCRIPTEN)
+    /* Reading at offset 0 fails with EIO, as nothing is mapped there */
+    const Containers::String from = "/proc/self/mem"_s;
+    #else
+    const Containers::String from;
+    CORRADE_SKIP("Not sure how to test on this system.");
+    #endif
+
+    CORRADE_VERIFY(Path::make(_writeTestDir));
+    Containers::String out;
+    Error redirectError{&out};
+    CORRADE_VERIFY(!Path::copy(from, Path::join(_writeTestDir, "copied")));
+    CORRADE_COMPARE_AS(out,
+        format("Utility::Path::copy(): can't read from {}: error ", from),
+        TestSuite::Compare::StringHasPrefix);
+}
+
+void PathTest::copyWriteIoError() {
+    CORRADE_VERIFY(Path::make(_writeTestDir));
+    const Containers::String from = Path::join(_writeTestDir, "copySource");
+    CORRADE_VERIFY(Path::write(from, "hello"_s));
+
+    #if defined(CORRADE_TARGET_WINDOWS) && !defined(CORRADE_TARGET_WINDOWS_RT)
+    const Containers::String to = Path::join(_writeTestDir, "locked");
+    CORRADE_VERIFY(Path::write(to, "a"_s));
+    FileLock lock{to};
+    CORRADE_VERIFY(lock.isLocked);
+    #elif defined(__linux__) && !defined(CORRADE_TARGET_EMSCRIPTEN)
+    /* Every write to it fails with ENOSPC */
+    const Containers::String to = "/dev/full"_s;
+    #else
+    const Containers::String to;
+    CORRADE_SKIP("Not sure how to test on this system.");
+    #endif
+
+    /* The data stay buffered until fclose() */
+    Containers::String out;
+    Error redirectError{&out};
+    CORRADE_VERIFY(!Path::copy(from, to));
+    CORRADE_COMPARE_AS(out,
+        format("Utility::Path::copy(): can't write to {}: error ", to),
+        TestSuite::Compare::StringHasPrefix);
 }
 
 void PathTest::copyNonNullTerminated() {

@@ -1383,7 +1383,24 @@ bool write(const Containers::StringView filename, const Containers::ArrayView<co
 
     Containers::ScopeGuard exit{f, std::fclose};
 
-    std::fwrite(data.data(), 1, data.size(), f);
+    if(std::fwrite(data.data(), 1, data.size(), f) != data.size()) {
+        const int error = errno;
+        Error err;
+        err << "Utility::Path::write(): can't write to" << filename << Debug::nospace << ":";
+        Utility::Implementation::printErrnoErrorString(err, error);
+        return false;
+    }
+
+    /* fclose() writes what's still buffered, so it can fail too */
+    exit.release();
+    if(std::fclose(f) != 0) {
+        const int error = errno;
+        Error err;
+        err << "Utility::Path::write(): can't write to" << filename << Debug::nospace << ":";
+        Utility::Implementation::printErrnoErrorString(err, error);
+        return false;
+    }
+
     return true;
 }
 
@@ -1403,7 +1420,24 @@ bool append(const Containers::StringView filename, const Containers::ArrayView<c
 
     Containers::ScopeGuard exit{f, std::fclose};
 
-    std::fwrite(data.data(), 1, data.size(), f);
+    if(std::fwrite(data.data(), 1, data.size(), f) != data.size()) {
+        const int error = errno;
+        Error err;
+        err << "Utility::Path::append(): can't write to" << filename << Debug::nospace << ":";
+        Utility::Implementation::printErrnoErrorString(err, error);
+        return false;
+    }
+
+    /* Same as in write() above */
+    exit.release();
+    if(std::fclose(f) != 0) {
+        const int error = errno;
+        Error err;
+        err << "Utility::Path::append(): can't write to" << filename << Debug::nospace << ":";
+        Utility::Implementation::printErrnoErrorString(err, error);
+        return false;
+    }
+
     return true;
 }
 
@@ -1476,8 +1510,31 @@ bool copy(const Containers::StringView from, const Containers::StringView to) {
     std::size_t count;
     do {
         count = std::fread(buffer, 1, Containers::arraySize(buffer), in);
-        std::fwrite(buffer, 1, count, out);
+        if(std::ferror(in)) {
+            const int error = errno;
+            Error err;
+            err << "Utility::Path::copy(): can't read from" << from << Debug::nospace << ":";
+            Utility::Implementation::printErrnoErrorString(err, error);
+            return false;
+        }
+        if(std::fwrite(buffer, 1, count, out) != count) {
+            const int error = errno;
+            Error err;
+            err << "Utility::Path::copy(): can't write to" << to << Debug::nospace << ":";
+            Utility::Implementation::printErrnoErrorString(err, error);
+            return false;
+        }
     } while(count);
+
+    /* Same as in write() above */
+    exitOut.release();
+    if(std::fclose(out) != 0) {
+        const int error = errno;
+        Error err;
+        err << "Utility::Path::copy(): can't write to" << to << Debug::nospace << ":";
+        Utility::Implementation::printErrnoErrorString(err, error);
+        return false;
+    }
 
     return true;
 }
