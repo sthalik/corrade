@@ -1320,6 +1320,14 @@ Containers::Optional<Containers::Array<char>> readInternal(const Containers::Str
             arrayRemoveSuffix(out, chunkSize + extra - count);
         } while(count);
 
+        if(std::ferror(f)) {
+            const int error = errno;
+            Error err;
+            err << "Utility::Path::read(): can't read from" << filename << Debug::nospace << ":";
+            Utility::Implementation::printErrnoErrorString(err, error);
+            return {};
+        }
+
         /* GCC 4.8 needs extra help here */
         return Containers::optional(Utility::move(out));
     }
@@ -1329,6 +1337,14 @@ Containers::Optional<Containers::Array<char>> readInternal(const Containers::Str
     Containers::Array<char> out{NoInit, *size_ + extra};
     const std::size_t realSize = std::fread(out.data(), 1, *size_, f);
     CORRADE_INTERNAL_ASSERT(realSize <= *size_);
+    if(std::ferror(f)) {
+        const int error = errno;
+        Error err;
+        err << "Utility::Path::read(): can't read from" << filename << Debug::nospace << ":";
+        Utility::Implementation::printErrnoErrorString(err, error);
+        return {};
+    }
+
     return Containers::Array<char>{out.release(), realSize};
 }
 

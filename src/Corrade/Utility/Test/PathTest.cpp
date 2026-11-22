@@ -230,6 +230,7 @@ struct PathTest: TestSuite::Tester {
     void readEarlyEofString();
     void readDirectory();
     void readNonexistent();
+    void readIoError();
     void readNonNullTerminated();
     void readUtf8();
 
@@ -790,6 +791,7 @@ PathTest::PathTest() {
               &PathTest::readEarlyEofString,
               &PathTest::readDirectory,
               &PathTest::readNonexistent,
+              &PathTest::readIoError,
               &PathTest::readNonNullTerminated,
               &PathTest::readUtf8,
 
@@ -3299,6 +3301,31 @@ void PathTest::readNonexistent() {
     /* String variant should return a NullOpt as well, not testing the message
        as it should be coming from read() */
     CORRADE_VERIFY(!Path::readString("nonexistent"));
+}
+
+void PathTest::readIoError() {
+    #if defined(CORRADE_TARGET_WINDOWS) && !defined(CORRADE_TARGET_WINDOWS_RT)
+    CORRADE_VERIFY(Path::make(_writeTestDir));
+    const Containers::String filename = Path::join(_writeTestDir, "locked");
+    CORRADE_VERIFY(Path::write(filename, "hello"_s));
+    FileLock lock{filename};
+    CORRADE_VERIFY(lock.isLocked);
+    #elif defined(__linux__) && !defined(CORRADE_TARGET_EMSCRIPTEN)
+    /* Not seekable, and reading at offset 0 fails with EIO, as nothing is
+       mapped there */
+    const Containers::String filename = "/proc/self/mem"_s;
+    #else
+    const Containers::String filename;
+    CORRADE_SKIP("Not sure how to test on this system.");
+    #endif
+
+    Containers::String out;
+    Error redirectError{&out};
+    CORRADE_VERIFY(!Path::read(filename));
+    CORRADE_VERIFY(!Path::readString(filename));
+    CORRADE_COMPARE_AS(out,
+        format("Utility::Path::read(): can't read from {}: error ", filename),
+        TestSuite::Compare::StringHasPrefix);
 }
 
 void PathTest::readNonNullTerminated() {
