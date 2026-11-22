@@ -875,6 +875,11 @@ Containers::Optional<Containers::String> homeDirectory() {
     /* Windows (not Store/Phone) */
     #elif defined(CORRADE_TARGET_WINDOWS) && !defined(CORRADE_TARGET_WINDOWS_RT)
     wchar_t* path = nullptr;
+    /* This could fail for example with E_INVALIDARG for system accounts
+       without a home folder */
+    const HRESULT result = SHGetKnownFolderPath(FOLDERID_Documents, KF_FLAG_DEFAULT, nullptr, &path);
+    /* The guard copies the pointer, so it's created only after the call. The
+       string has to be freed even if the call fails. */
     Containers::ScopeGuard guard{path,
         #ifdef CORRADE_MSVC2015_COMPATIBILITY
         /* MSVC 2015 is unable to cast the parameter for CoTaskMemFree */
@@ -883,12 +888,10 @@ Containers::Optional<Containers::String> homeDirectory() {
         CoTaskMemFree
         #endif
     };
-    /* This could fail for example with E_INVALIDARG for system accounts
-       without a home folder */
-    if(SHGetKnownFolderPath(FOLDERID_Documents, KF_FLAG_DEFAULT, nullptr, &path) != S_OK) {
+    if(result != S_OK) {
         Error err;
         err << "Utility::Path::homeDirectory(): can't retrieve FOLDERID_Documents:";
-        Utility::Implementation::printWindowsErrorString(err, GetLastError());
+        Utility::Implementation::printWindowsErrorString(err, HRESULT_FACILITY(result) == FACILITY_WIN32 ? HRESULT_CODE(result) : result);
         return {};
     }
     return fromNativeSeparators(Unicode::narrow(path));
@@ -933,6 +936,10 @@ Containers::Optional<Containers::String> configurationDirectory(const Containers
     /* Windows (not Store/Phone) */
     #elif defined(CORRADE_TARGET_WINDOWS) && !defined(CORRADE_TARGET_WINDOWS_RT)
     wchar_t* path = nullptr;
+    /* This could fail for example with E_INVALIDARG for system accounts
+       without a home folder */
+    const HRESULT result = SHGetKnownFolderPath(FOLDERID_RoamingAppData, KF_FLAG_DEFAULT, nullptr, &path);
+    /* Same as in homeDirectory() above */
     Containers::ScopeGuard guard{path,
         #ifdef CORRADE_MSVC2015_COMPATIBILITY
         /* MSVC 2015 is unable to cast the parameter for CoTaskMemFree */
@@ -941,12 +948,10 @@ Containers::Optional<Containers::String> configurationDirectory(const Containers
         CoTaskMemFree
         #endif
     };
-    /* This could fail for example with E_INVALIDARG for system accounts
-       without a home folder */
-    if(SHGetKnownFolderPath(FOLDERID_RoamingAppData, KF_FLAG_DEFAULT, nullptr, &path) != S_OK) {
+    if(result != S_OK) {
         Error err;
         err << "Utility::Path::configurationDirectory(): can't retrieve FOLDERID_RoamingAppData:";
-        Utility::Implementation::printWindowsErrorString(err, GetLastError());
+        Utility::Implementation::printWindowsErrorString(err, HRESULT_FACILITY(result) == FACILITY_WIN32 ? HRESULT_CODE(result) : result);
         return {};
     }
     return join(fromNativeSeparators(Unicode::narrow(path)), applicationName);

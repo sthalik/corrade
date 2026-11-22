@@ -2225,14 +2225,9 @@ void PathTest::homeDirectoryInvalid() {
     Containers::String out;
     Error redirectError{&out};
     CORRADE_VERIFY(!Path::homeDirectory());
-    /** @todo It produces 1008 (An attempt was made to reference a token that
-        does not exist.) for the second failure, but the first failure in
-        homeDirectory() above is error 2 (The system cannot find the file
-        specified.). Am I triggering some other error in between, or does the
-        first lookup trigger some OS-internal update that makes it fail earlier
-        or differently the second time? */
+    /* The code depends on why the query failed */
     CORRADE_COMPARE_AS(out,
-        "Utility::Path::homeDirectory(): can't retrieve FOLDERID_Documents: error 1008 (",
+        "Utility::Path::homeDirectory(): can't retrieve FOLDERID_Documents: error ",
         TestSuite::Compare::StringHasPrefix);
 
     #else
