@@ -159,6 +159,10 @@ Containers::String replaceSeparators(Containers::String path, const char search,
 }
 
 Containers::String fromNativeSeparators(Containers::String path) {
+    /* Windows converts no / after exactly \\?\, so they'd make another path */
+    if(path.hasPrefix("\\\\?\\"_s))
+        return path;
+
     return
         #ifdef CORRADE_TARGET_EMSCRIPTEN
         corradeUtilityIsNodeOnWindows() ?

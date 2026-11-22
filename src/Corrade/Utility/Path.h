@@ -74,7 +74,9 @@ class MapDeleter;
 
 On Windows (and on @ref CORRADE_TARGET_EMSCRIPTEN "Emscripten" if running under
 Node.js on Windows) converts backward slashes to forward slashes, on all other
-platforms returns the input argument untouched.
+platforms returns the input argument untouched. A path starting with exactly
+@cpp "\\\\?\\" @ce is returned untouched as well, as Windows converts no
+forward slashes in it.
 
 On Windows and Emscripten the argument and return type is
 @ref Containers::String and the operation is performed in-place if @p path is
@@ -416,8 +418,9 @@ with overly restrictive VMs), prints a message to @ref Error and returns
 Returned value is encoded in UTF-8, on Windows it's first converted from a
 UTF-16 representation using @ref Unicode::narrow().
 @note For consistency is the path returned with forward slashes on all
-    platforms. Use @ref toNativeSeparators() to convert it to platform-specific
-    format, if needed.
+    platforms, except a path starting with exactly @cpp "\\\\?\\" @ce, in
+    which Windows converts no forward slashes. Use @ref toNativeSeparators() to
+    convert it to platform-specific format, if needed.
 @see @ref currentDirectory(), @ref libraryLocation()
 */
 CORRADE_UTILITY_EXPORT Containers::Optional<Containers::String> executableLocation();
@@ -441,8 +444,9 @@ multithreaded applications may have bad consequences. See the
 @m_class{m-doc-external} [GetCurrentDirectory()](https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getcurrentdirectory)
 documentation for details.
 @note For consistency is the path returned with forward slashes on all
-    platforms. Use @ref toNativeSeparators() to convert it to platform-specific
-    format, if needed.
+    platforms, except a path starting with exactly @cpp "\\\\?\\" @ce, in
+    which Windows converts no forward slashes. Use @ref toNativeSeparators() to
+    convert it to platform-specific format, if needed.
 @see @ref executableLocation()
 */
 CORRADE_UTILITY_EXPORT Containers::Optional<Containers::String> currentDirectory();
@@ -466,8 +470,9 @@ mounted.
 Returned value is encoded in UTF-8, on Windows it's first converted from a
 UTF-16 representation using @ref Unicode::narrow().
 @note For consistency is the path returned with forward slashes on all
-    platforms. Use @ref toNativeSeparators() to convert it to platform-specific
-    format, if needed.
+    platforms, except a path starting with exactly @cpp "\\\\?\\" @ce, in
+    which Windows converts no forward slashes. Use @ref toNativeSeparators() to
+    convert it to platform-specific format, if needed.
 */
 CORRADE_UTILITY_EXPORT Containers::Optional<Containers::String> homeDirectory();
 
@@ -494,8 +499,9 @@ points to a location on a volume that isn't currently mounted.
 Returned value is encoded in UTF-8, on Windows it's first converted from a
 UTF-16 representation using @ref Unicode::narrow().
 @note For consistency is the path returned with forward slashes on all
-    platforms. Use @ref toNativeSeparators() to convert it to platform-specific
-    format, if needed.
+    platforms, except a path starting with exactly @cpp "\\\\?\\" @ce, in
+    which Windows converts no forward slashes. Use @ref toNativeSeparators() to
+    convert it to platform-specific format, if needed.
 */
 CORRADE_UTILITY_EXPORT Containers::Optional<Containers::String> configurationDirectory(Containers::StringView name);
 
@@ -512,8 +518,9 @@ On other systems or if the directory can't be found, prints a message to
 Returned value is encoded in UTF-8, on Windows it's first converted from a
 UTF-16 representation using @ref Unicode::narrow().
 @note For consistency is the path returned with forward slashes on all
-    platforms. Use @ref toNativeSeparators() to convert it to platform-specific
-    format, if needed.
+    platforms, except a path starting with exactly @cpp "\\\\?\\" @ce, in
+    which Windows converts no forward slashes. Use @ref toNativeSeparators() to
+    convert it to platform-specific format, if needed.
 */
 CORRADE_UTILITY_EXPORT Containers::Optional<Containers::String> temporaryDirectory();
 

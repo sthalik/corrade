@@ -54,6 +54,15 @@
 #include <unistd.h>
 #endif
 
+#if defined(CORRADE_TARGET_WINDOWS) && !defined(CORRADE_TARGET_WINDOWS_RT)
+/* Needed for SetCurrentDirectoryW() in currentDirectoryExtendedLength() */
+#include "Corrade/Utility/Unicode.h"
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#endif
+
 #include "configure.h"
 
 namespace Corrade { namespace Utility { namespace Test { namespace {
@@ -125,6 +134,7 @@ struct PathTest: TestSuite::Tester {
     void currentDirectory();
     void currentDirectoryGlobalConstructor();
     void currentDirectoryNonexistent();
+    void currentDirectoryExtendedLength();
     void currentDirectoryUtf8();
 
     #ifndef CORRADE_BUILD_STATIC
@@ -679,6 +689,7 @@ PathTest::PathTest() {
               &PathTest::currentDirectory,
               &PathTest::currentDirectoryGlobalConstructor,
               &PathTest::currentDirectoryNonexistent,
+              &PathTest::currentDirectoryExtendedLength,
               &PathTest::currentDirectoryUtf8,
 
               #ifndef CORRADE_BUILD_STATIC
@@ -900,6 +911,9 @@ void PathTest::fromNativeSeparators() {
             #endif
         ;
     CORRADE_COMPARE(nativeSeparators, expected);
+
+    /* Forward slashes would make this a different path on Windows */
+    CORRADE_COMPARE(Path::fromNativeSeparators("\\\\?\\C:\\put\\that"), "\\\\?\\C:\\put\\that");
 }
 
 void PathTest::fromNativeSeparatorsRvalue() {
@@ -1914,6 +1928,33 @@ void PathTest::currentDirectoryNonexistent() {
     CORRADE_COMPARE(Path::currentDirectory(), currentDirectory);
     #else
     CORRADE_SKIP("Known to fail only on UNIX, not sure how to test elsewhere.");
+    #endif
+}
+
+void PathTest::currentDirectoryExtendedLength() {
+    #if defined(CORRADE_TARGET_WINDOWS) && !defined(CORRADE_TARGET_WINDOWS_RT)
+    Containers::Optional<Containers::String> currentDirectory = Path::currentDirectory();
+    CORRADE_VERIFY(currentDirectory);
+    CORRADE_VERIFY(*currentDirectory);
+    if(currentDirectory->hasPrefix("\\\\?\\"_s))
+        CORRADE_SKIP("The current directory is already an extended-length path.");
+
+    /* Windows reports the directory with the prefix it was set with */
+    const Containers::String extended = "\\\\?\\"_s + Path::toNativeSeparators(*currentDirectory);
+    {
+        /** @todo remove (and <windows.h>) once Path::setCurrent() exists */
+        Containers::ScopeGuard resetCurrent{&*currentDirectory, [](Containers::String* current) {
+            CORRADE_VERIFY(SetCurrentDirectoryW(Unicode::widen(*current).data()));
+        }};
+        CORRADE_VERIFY(SetCurrentDirectoryW(Unicode::widen(extended).data()));
+        CORRADE_COMPARE(Path::currentDirectory(), extended);
+    }
+
+    /* Verify that we're back to the original directory so other tests relying
+       on it keep working */
+    CORRADE_COMPARE(Path::currentDirectory(), currentDirectory);
+    #else
+    CORRADE_SKIP("Extended-length paths exist only on Windows.");
     #endif
 }
 
