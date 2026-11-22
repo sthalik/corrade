@@ -992,16 +992,20 @@ Containers::Optional<Containers::String> temporaryDirectory() {
     #elif defined(CORRADE_TARGET_WINDOWS) && !defined(CORRADE_TARGET_WINDOWS_RT)
     /* Windows */
 
-    /* Get path size. Includes a trailing slash and a zero terminator. */
-    wchar_t c;
-    const std::size_t size = GetTempPathW(1, &c);
-    CORRADE_INTERNAL_ASSERT(size >= 2);
+    /* A size query first would race with another thread changing %TMP%. The
+       path has at most MAX_PATH + 1 characters with its trailing backslash. */
+    wchar_t path[MAX_PATH + 2];
+    const DWORD size = GetTempPathW(Containers::arraySize(path), path);
+    if(!size || size >= Containers::arraySize(path)) {
+        const DWORD error = GetLastError();
+        Error err;
+        err << "Utility::Path::temporaryDirectory():";
+        Utility::Implementation::printWindowsErrorString(err, error);
+        return {};
+    }
 
-    /* Get the path, convert to forward slashes, strip the trailing slash and
-       zero terminator */
-    Containers::Array<wchar_t> path{NoInit, size};
-    GetTempPathW(size, path.data());
-    return fromNativeSeparators(Unicode::narrow(path.exceptSuffix(2)));
+    /* Convert to forward slashes, strip the trailing slash */
+    return fromNativeSeparators(Unicode::narrow(Containers::arrayView(path).prefix(size - 1)));
     #else
     Error{} << "Utility::Path::temporaryDirectory(): not implemented on this platform";
     return {};
