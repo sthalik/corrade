@@ -105,8 +105,8 @@
 #include "Corrade/Containers/StringIterable.h"
 #include "Corrade/Utility/Debug.h"
 
-#if defined(__unix__) || defined(CORRADE_TARGET_EMSCRIPTEN) || defined(CORRADE_TARGET_WINDOWS)
-#include "Corrade/Utility/String.h" /* lowercase(), replaceAll() on Windows */
+#if defined(__unix__) || defined(CORRADE_TARGET_EMSCRIPTEN)
+#include "Corrade/Utility/String.h" /* lowercase() */
 #endif
 
 #ifdef CORRADE_TARGET_APPLE
@@ -136,12 +136,34 @@ namespace Corrade { namespace Utility { namespace Path {
 using namespace Containers::Literals;
 
 #if defined(CORRADE_TARGET_WINDOWS) || defined(CORRADE_TARGET_EMSCRIPTEN)
+namespace {
+
+/* String::replaceAll() calls through a CPU-dispatched pointer, which a static
+   build leaves null until Corrade's own global constructors run */
+Containers::String replaceSeparators(Containers::String path, const char search, const char replace) {
+    std::size_t i = 0;
+    while(i != path.size() && path[i] != search)
+        ++i;
+    if(i == path.size())
+        return path;
+
+    /* A deleter can mean a view on memory the String doesn't own */
+    if(!path.isSmall() && path.deleter())
+        path = Containers::String{path};
+    for(; i != path.size(); ++i)
+        if(path[i] == search)
+            path[i] = replace;
+    return path;
+}
+
+}
+
 Containers::String fromNativeSeparators(Containers::String path) {
     return
         #ifdef CORRADE_TARGET_EMSCRIPTEN
         corradeUtilityIsNodeOnWindows() ?
         #endif
-        String::replaceAll(Utility::move(path), '\\', '/')
+        replaceSeparators(Utility::move(path), '\\', '/')
         #ifdef CORRADE_TARGET_EMSCRIPTEN
         : Utility::move(path)
         #endif
@@ -159,7 +181,7 @@ Containers::String toNativeSeparators(Containers::String path) {
         #ifdef CORRADE_TARGET_EMSCRIPTEN
         corradeUtilityIsNodeOnWindows() ?
         #endif
-        String::replaceAll(Utility::move(path), '/', '\\')
+        replaceSeparators(Utility::move(path), '/', '\\')
         #ifdef CORRADE_TARGET_EMSCRIPTEN
         : Utility::move(path)
         #endif

@@ -58,6 +58,9 @@
 
 namespace Corrade { namespace Utility { namespace Test { namespace {
 
+/* In a static build this can run before Corrade's own global constructors */
+const Containers::Optional<Containers::String> CurrentDirectoryFromGlobalConstructor = Path::currentDirectory();
+
 struct PathTest: TestSuite::Tester {
     explicit PathTest();
 
@@ -118,6 +121,7 @@ struct PathTest: TestSuite::Tester {
     void moveUtf8();
 
     void currentDirectory();
+    void currentDirectoryGlobalConstructor();
     void currentDirectoryNonexistent();
     void currentDirectoryUtf8();
 
@@ -528,6 +532,7 @@ PathTest::PathTest() {
               /* These don't pass any strings to system APIs, so no need to
                  verify non-null-terminated variants */
               &PathTest::currentDirectory,
+              &PathTest::currentDirectoryGlobalConstructor,
               &PathTest::currentDirectoryNonexistent,
               &PathTest::currentDirectoryUtf8,
 
@@ -1671,6 +1676,11 @@ void PathTest::currentDirectory() {
     #ifdef CORRADE_TARGET_WINDOWS
     CORRADE_COMPARE_AS(*current, "\\", TestSuite::Compare::StringNotContains);
     #endif
+}
+
+void PathTest::currentDirectoryGlobalConstructor() {
+    CORRADE_VERIFY(CurrentDirectoryFromGlobalConstructor);
+    CORRADE_COMPARE(CurrentDirectoryFromGlobalConstructor, Path::currentDirectory());
 }
 
 void PathTest::currentDirectoryNonexistent() {
