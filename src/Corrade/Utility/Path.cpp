@@ -1724,8 +1724,9 @@ Containers::Optional<Containers::Array<char, MapDeleter>> mapWrite(const Contain
         hMap = {};
         data = nullptr;
     } else {
-        /* Create the file mapping */
-        if(!(hMap = CreateFileMappingW(hFile, nullptr, PAGE_READWRITE, 0, size, nullptr))) {
+        /* Create the file mapping, with the size split into the high and low
+           32 bits */
+        if(!(hMap = CreateFileMappingW(hFile, nullptr, PAGE_READWRITE, DWORD(std::uint64_t(size) >> 32), DWORD(size & 0xffffffff), nullptr))) {
             Error err;
             err << "Utility::Path::mapWrite(): can't create file mapping for" << filename << Debug::nospace << ":";
             Utility::Implementation::printWindowsErrorString(err, GetLastError());
