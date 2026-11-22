@@ -1004,8 +1004,12 @@ Containers::Optional<Containers::String> temporaryDirectory() {
         return {};
     }
 
-    /* Convert to forward slashes, strip the trailing slash */
-    return fromNativeSeparators(Unicode::narrow(Containers::arrayView(path).prefix(size - 1)));
+    /* Strip the trailing backslash unless it's the root's, as "C:" is the
+       current directory of drive C */
+    Containers::String out = Unicode::narrow(Containers::arrayView(path).prefix(size));
+    if(out.size() > rootSize(out, isExtendedLengthPath(out)))
+        out = Containers::String{out.exceptSuffix(1)};
+    return fromNativeSeparators(Utility::move(out));
     #else
     Error{} << "Utility::Path::temporaryDirectory(): not implemented on this platform";
     return {};

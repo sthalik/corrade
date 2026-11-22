@@ -159,6 +159,7 @@ struct PathTest: TestSuite::Tester {
     void configurationDirectoryUtf8();
 
     void temporaryDirectory();
+    void temporaryDirectoryRoot();
     void temporaryDirectoryInvalid();
     void temporaryDirectoryUtf8();
 
@@ -714,6 +715,7 @@ PathTest::PathTest() {
               &PathTest::configurationDirectoryUtf8,
 
               &PathTest::temporaryDirectory,
+              &PathTest::temporaryDirectoryRoot,
               &PathTest::temporaryDirectoryInvalid,
               &PathTest::temporaryDirectoryUtf8,
 
@@ -2415,6 +2417,22 @@ void PathTest::temporaryDirectory() {
         CORRADE_VERIFY(Path::write(Path::join(*temporaryDirectory, "a"), "hello"_s));
         CORRADE_VERIFY(Path::remove(Path::join(*temporaryDirectory, "a")));
     }
+}
+
+void PathTest::temporaryDirectoryRoot() {
+    #if !defined(CORRADE_TARGET_WINDOWS) || defined(CORRADE_TARGET_WINDOWS_RT)
+    CORRADE_SKIP("Only Windows takes the directory from %TMP%.");
+    #else
+    const char* const tmp = std::getenv("TMP");
+    const Containers::String previous = tmp ? tmp : "";
+    _putenv_s("TMP", "C:\\");
+    Containers::Optional<Containers::String> temporaryDirectory = Path::temporaryDirectory();
+    /* An empty value removes the variable */
+    _putenv_s("TMP", previous.data());
+
+    CORRADE_VERIFY(temporaryDirectory);
+    CORRADE_COMPARE(*temporaryDirectory, "C:/");
+    #endif
 }
 
 void PathTest::temporaryDirectoryInvalid() {
