@@ -187,25 +187,12 @@ void AbstractPluginTest::accessMovedOut() {
     a.metadata();
     a.configuration();
     ca.configuration();
-    /* The assert has to return *something* so it dereferences null _state,
-       resulting in another (debug-only) assert in Containers::Pointer */
-    #ifdef CORRADE_IS_DEBUG_BUILD
-    CORRADE_COMPARE_AS(out,
-        "PluginManager::AbstractPlugin::plugin(): can't be called on a moved-out plugin\n"
-        "PluginManager::AbstractPlugin::metadata(): can't be called on a moved-out plugin\n"
-        "PluginManager::AbstractPlugin::configuration(): can't be called on a moved-out plugin\n"
-        "Containers::Pointer: the pointer is null\n"
-        "PluginManager::AbstractPlugin::configuration(): can't be called on a moved-out plugin\n"
-        "Containers::Pointer: the pointer is null\n",
-        TestSuite::Compare::String);
-    #else
     CORRADE_COMPARE_AS(out,
         "PluginManager::AbstractPlugin::plugin(): can't be called on a moved-out plugin\n"
         "PluginManager::AbstractPlugin::metadata(): can't be called on a moved-out plugin\n"
         "PluginManager::AbstractPlugin::configuration(): can't be called on a moved-out plugin\n"
         "PluginManager::AbstractPlugin::configuration(): can't be called on a moved-out plugin\n",
         TestSuite::Compare::String);
-    #endif
 }
 
 void AbstractPluginTest::accessMovedOutManaging() {

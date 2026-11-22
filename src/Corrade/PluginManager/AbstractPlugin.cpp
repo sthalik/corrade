@@ -48,6 +48,18 @@ struct AbstractPlugin::State {
     Utility::ConfigurationGroup configuration{};
 };
 
+#ifdef CORRADE_GRACEFUL_ASSERT
+namespace {
+
+/* A moved-out plugin has no _state to return a configuration from */
+Utility::ConfigurationGroup& movedOutPluginConfiguration() {
+    static Utility::ConfigurationGroup configuration;
+    return configuration;
+}
+
+}
+#endif
+
 Containers::StringView AbstractPlugin::pluginInterface() { return ""_s; }
 
 #ifndef CORRADE_PLUGINMANAGER_NO_DYNAMIC_PLUGIN_SUPPORT
@@ -118,11 +130,11 @@ const PluginMetadata* AbstractPlugin::metadata() const {
 }
 
 Utility::ConfigurationGroup& AbstractPlugin::configuration() {
-    CORRADE_ASSERT(_state, "PluginManager::AbstractPlugin::configuration(): can't be called on a moved-out plugin", _state->configuration);
+    CORRADE_ASSERT(_state, "PluginManager::AbstractPlugin::configuration(): can't be called on a moved-out plugin", movedOutPluginConfiguration());
     return _state->configuration;
 }
 const Utility::ConfigurationGroup& AbstractPlugin::configuration() const {
-    CORRADE_ASSERT(_state, "PluginManager::AbstractPlugin::configuration(): can't be called on a moved-out plugin", _state->configuration);
+    CORRADE_ASSERT(_state, "PluginManager::AbstractPlugin::configuration(): can't be called on a moved-out plugin", movedOutPluginConfiguration());
     return _state->configuration;
 }
 
