@@ -1040,7 +1040,7 @@ Containers::Optional<Containers::Array<Containers::String>> list(const Container
         #ifndef CORRADE_TARGET_EMSCRIPTEN
         if((flags >= ListFlag::SkipFiles) && entry->d_type == DT_REG)
             continue;
-        if((flags >= ListFlag::SkipSpecial) && entry->d_type != DT_DIR && entry->d_type != DT_REG && entry->d_type != DT_LNK)
+        if((flags >= ListFlag::SkipSpecial) && entry->d_type != DT_DIR && entry->d_type != DT_REG && entry->d_type != DT_LNK && entry->d_type != DT_UNKNOWN)
             continue;
         #else
         /* Emscripten doesn't set DT_REG for files, so we treat everything
@@ -1049,14 +1049,18 @@ Containers::Optional<Containers::Array<Containers::String>> list(const Container
             continue;
         #endif
 
-        /* For symlinks we have to deref the link and ask there again. If that
-           fails for whatever reason, we leave the file in the list -- it can
-           be thought of as "neither a file nor directory" and we're told to
-           skip files/directories, not "include only files/directories".
+        /* For symlinks and DT_UNKNOWN we have to ask stat() for the type. If
+           that fails for whatever reason, we leave the file in the list -- it
+           can be thought of as "neither a file nor directory" and we're told
+           to skip files/directories, not "include only files/directories".
 
            Also do this only if we're told to skip certain entry types, for a
            plain list this is unnecessary overhead. */
-        if((flags & (ListFlag::SkipDirectories|ListFlag::SkipFiles|ListFlag::SkipSpecial)) && entry->d_type == DT_LNK) {
+        if((flags & (ListFlag::SkipDirectories|ListFlag::SkipFiles|ListFlag::SkipSpecial)) && (entry->d_type == DT_LNK
+            #ifndef CORRADE_TARGET_EMSCRIPTEN
+            || entry->d_type == DT_UNKNOWN
+            #endif
+        )) {
             /* stat() follows the symlink, lstat() doesn't */
             struct stat st;
             /** @todo once we figure out a way to test, handle errors from
