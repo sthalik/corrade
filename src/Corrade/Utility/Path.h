@@ -188,20 +188,22 @@ CORRADE_UTILITY_EXPORT Containers::Pair<Containers::StringView, Containers::Stri
 @brief Join path and filename
 @m_since_latest
 
-If the @p path is empty or the @p filename is absolute (with a leading slash, or
-a drive letter on Windows or on @ref CORRADE_TARGET_EMSCRIPTEN "Emscripten" if
-running under Node.js on Windows), returns @p filename. Otherwise joins them
-together with a forward slash, unless present in @p path already. Behavior is
-equivalent to @m_class{m-doc-external} [os.path.split()](https://docs.python.org/3/library/os.path.html#os.path.split).
-For example:
+If the @p path is empty or the @p filename has a root as described in
+@ref split(), returns @p filename. Otherwise joins them together with a forward
+slash, unless @p path ends with a directory separator already. If @p path
+starts with exactly @cpp "\\\\?\\" @ce, joins them with a backslash instead and
+converts forward slashes in @p filename to backslashes, as Windows converts no
+slashes in such a path. Behavior is similar to Python
+@m_class{m-doc-external} [os.path.join()](https://docs.python.org/3/library/os.path.html#os.path.join),
+except that a @p filename such as @cpp "/file" @ce or @cpp "C:file" @ce
+replaces the whole @p path on Windows, drive letter included. For example:
 
 -   @cpp {"path/to", "file"} @ce results in @cpp "path/to/file" @ce
 -   @cpp {"path/to/", "file"} @ce results in @cpp "path/to/file" @ce
 -   @cpp {"", "file"} @ce results in @cpp "file" @ce
 -   @cpp {"path", "/absolute/file"} @ce results in @cpp "/absolute/file" @ce
+-   @cpp {"C:", "file"} @ce results in @cpp "C:/file" @ce on Windows
 
-The implementation expects forward slashes as directory separators. Use
-@ref fromNativeSeparators() to convert from a platform-specific format.
 @see @ref split()
 */
 CORRADE_UTILITY_EXPORT Containers::String join(Containers::StringView path, Containers::StringView filename);
@@ -214,9 +216,6 @@ Result is equivalent to recursively calling
 @ref join(Containers::StringView, Containers::StringView) on consecutive pairs
 of input arguments. When @p paths is empty, returns an empty string, when it's
 just a single path, returns it verbatim.
-
-The implementation expects forward slashes as directory separators. Use
-@ref fromNativeSeparators() to convert from a platform-specific format.
 */
 CORRADE_UTILITY_EXPORT Containers::String join(const Containers::StringIterable& paths);
 

@@ -423,6 +423,50 @@ const struct {
 
 const struct {
     const char* name;
+    const char* path;
+    const char* filename;
+    const char* expected;
+    const char* expectedNonWindows;
+} JoinWindowsData[]{
+    /* Unlike Python's ntpath.join(), a filename with a drive letter or a
+       leading separator replaces the whole path */
+    {"drive letter",
+        "/foo/bar", "X:/path/file.txt",
+        "X:/path/file.txt", "/foo/bar/X:/path/file.txt"},
+    {"drive letter and backslashes",
+        "D:/cwd", "C:\\foo\\x.json",
+        "C:\\foo\\x.json", "D:/cwd/C:\\foo\\x.json"},
+    {"drive-relative filename",
+        "C:/foo", "C:file.txt",
+        "C:file.txt", "C:/foo/C:file.txt"},
+    {"filename with a leading backslash",
+        "D:/foo", "\\file.txt",
+        "\\file.txt", "D:/foo/\\file.txt"},
+    {"UNC filename",
+        "D:/foo", "\\\\server\\share\\file.txt",
+        "\\\\server\\share\\file.txt", "D:/foo/\\\\server\\share\\file.txt"},
+    {"extended-length filename",
+        "D:/foo", "\\\\?\\C:\\file.txt",
+        "\\\\?\\C:\\file.txt", "D:/foo/\\\\?\\C:\\file.txt"},
+    {"drive letter alone",
+        "C:", "file.txt",
+        "C:/file.txt", "C:/file.txt"},
+    {"trailing backslash",
+        "C:\\foo\\", "file.txt",
+        "C:\\foo\\file.txt", "C:\\foo\\/file.txt"},
+    {"extended-length path",
+        "\\\\?\\C:\\foo", "bar/file.txt",
+        "\\\\?\\C:\\foo\\bar\\file.txt", "\\\\?\\C:\\foo/bar/file.txt"},
+    {"extended-length drive root",
+        "\\\\?\\C:\\", "file.txt",
+        "\\\\?\\C:\\file.txt", "\\\\?\\C:\\/file.txt"},
+    {"device path starting with //?/",
+        "//?/C:/foo", "bar/file.txt",
+        "//?/C:/foo/bar/file.txt", "//?/C:/foo/bar/file.txt"},
+};
+
+const struct {
+    const char* name;
     const char* filename;
 } JoinBenchmarkData[]{
     {"regular filename",
@@ -580,9 +624,12 @@ PathTest::PathTest() {
               &PathTest::splitExtensionWindows,
               &PathTest::splitExtensionFlags,
 
-              &PathTest::join,
-              &PathTest::joinWindows,
-              &PathTest::joinMultiple,
+              &PathTest::join});
+
+    addInstancedTests({&PathTest::joinWindows},
+        Containers::arraySize(JoinWindowsData));
+
+    addTests({&PathTest::joinMultiple,
               &PathTest::joinMultipleAbsolute,
               &PathTest::joinMultipleOneEmpty,
               &PathTest::joinMultipleJustOne,
@@ -1116,32 +1163,22 @@ void PathTest::join() {
 }
 
 void PathTest::joinWindows() {
-    /* Enabled also on non-Windows platforms to make sure the drive letter
-       detection isn't done by accident elsewhere */
+    auto&& data = JoinWindowsData[testCaseInstanceId()];
+    setTestCaseDescription(data.name);
 
+    /* Enabled also on non-Windows platforms to make sure the Windows rules
+       aren't applied by accident elsewhere */
     #ifdef CORRADE_TARGET_EMSCRIPTEN
-    bool isWindows = isNodeOnWindows();
+    const bool isWindows = isNodeOnWindows();
     if(isWindows)
         CORRADE_INFO("Running through node.js on Windows");
+    #elif defined(CORRADE_TARGET_WINDOWS)
+    const bool isWindows = true;
+    #else
+    const bool isWindows = false;
     #endif
 
-    /* Drive letter. Verify also that the Windows-specific rules are *not*
-       applied if not running on Windows. */
-    const char* expected =
-        #ifdef CORRADE_TARGET_EMSCRIPTEN
-        isWindows ?
-        #endif
-            #if defined(CORRADE_TARGET_WINDOWS) || defined(CORRADE_TARGET_EMSCRIPTEN)
-            "X:/path/file.txt"
-            #endif
-            #ifdef CORRADE_TARGET_EMSCRIPTEN
-            :
-            #endif
-            #if !defined(CORRADE_TARGET_WINDOWS) || defined(CORRADE_TARGET_EMSCRIPTEN)
-            "/foo/bar/X:/path/file.txt"
-            #endif
-        ;
-    CORRADE_COMPARE(Path::join("/foo/bar", "X:/path/file.txt"), expected);
+    CORRADE_COMPARE(Path::join(data.path, data.filename), isWindows ? data.expected : data.expectedNonWindows);
 }
 
 void PathTest::joinMultiple() {
@@ -1168,11 +1205,9 @@ void PathTest::joinBenchmark() {
     auto&& data = JoinBenchmarkData[testCaseInstanceId()];
     setTestCaseDescription(data.name);
 
-    /* On Emscripten there's a runtime call into JS to check for the platform
-       being Windows, but to avoid overhead in all calls to join() it's done
-       only if the filename starts with a drive letter. The benchmark compares
-       a regular filename and the overhead of a path starting with a drive
-       letter. On all other platforms there should be no difference. */
+    /* On Emscripten only the first call asks JS whether the platform is
+       Windows. The benchmark compares a regular filename and a filename
+       starting with a drive letter, which returns early on Windows. */
 
     Containers::String path = "/some/directory";
 

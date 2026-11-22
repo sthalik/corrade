@@ -233,6 +233,8 @@ std::size_t serverShareSize(const Containers::StringView path, const bool isExte
     return share ? server + 1 + share : 0;
 }
 
+/** @todo might also want to check for Unicode characters in drive name
+    https://www.ryanliptak.com/blog/windows-drive-letters-are-not-limited-to-a-z/ */
 bool hasDriveLetter(const Containers::StringView path) {
     return path.size() >= 2 && (path[0] | 0x20) >= 'a' && (path[0] | 0x20) <= 'z' && path[1] == ':';
 }
@@ -312,36 +314,25 @@ Containers::Pair<Containers::StringView, Containers::StringView> splitExtension(
     return {path.prefix(foundDot.begin()), path.suffix(foundDot.begin())};
 }
 
-Containers::String join(Containers::StringView path, const Containers::StringView filename) {
-    if(
-        /* Empty path */
-        !path ||
-
-        /* Absolute filename */
-        filename.hasPrefix('/')
-
-        #if defined(CORRADE_TARGET_WINDOWS) || defined(CORRADE_TARGET_EMSCRIPTEN)
-        /* Absolute filename on Windows. Emscripten pretends to be Unix but we
-           can be running through node.js on Windows, and there path joining
-           should work as expected too. The Windows detection is a call to JS,
-           so to minimize the overhead check for the drive letter first and for
-           Windows second. */
-        /** @todo might also want to check for Unicode characters in drive name
-            https://www.ryanliptak.com/blog/windows-drive-letters-are-not-limited-to-a-z/ */
-        || (filename.size() > 2 && filename[1] == ':' && filename[2] == '/'
-            #ifdef CORRADE_TARGET_EMSCRIPTEN
-            && corradeUtilityIsNodeOnWindows()
-            #endif
-        )
-        #endif
-    )
+Containers::String join(const Containers::StringView path, const Containers::StringView filename) {
+    /* A filename with a root, drive-relative C:file included, replaces the
+       path */
+    if(!path || rootSize(filename, isExtendedLengthPath(filename)))
         return filename;
 
-    /* Join with a slash in between. If it's already there, slice it away first
-       so we have uniform handling. */
-    if(path.hasSuffix('/'))
-        path = path.exceptSuffix(1);
-    return "/"_s.join({path, filename});
+    const bool isExtendedLength = isExtendedLengthPath(path);
+    const Containers::StringView separator =
+        isSeparator(path.back(), isExtendedLength) ? ""_s :
+        isExtendedLength ? "\\"_s : "/"_s;
+    Containers::String out = separator.join({path, filename});
+
+    /* Windows converts no / after exactly \\?\ */
+    if(isExtendedLength)
+        for(char& c: out.exceptPrefix(path.size()))
+            if(c == '/')
+                c = '\\';
+
+    return out;
 }
 
 Containers::String join(const Containers::StringIterable& paths) {
