@@ -193,12 +193,86 @@ Containers::StringView toNativeSeparators(const Containers::StringView path) {
 }
 #endif
 
-Containers::Pair<Containers::StringView, Containers::StringView> split(const Containers::StringView path) {
-    const Containers::StringView found = path.findLast('/');
+namespace {
 
-    /* Strip the trailing / from path unless it's the root */
-    const Containers::StringView head = path.prefix(found.end());
-    return {path.prefix(head == "/"_s || head == "//"_s ? found.end() : found.begin()), path.suffix(found.end())};
+inline bool isRunningOnWindows() {
+    #ifdef CORRADE_TARGET_WINDOWS
+    return true;
+    #elif defined(CORRADE_TARGET_EMSCRIPTEN)
+    /* Asks Node.js through a call into JS, so only once */
+    static const bool isRunning = corradeUtilityIsNodeOnWindows();
+    return isRunning;
+    #else
+    return false;
+    #endif
+}
+
+/* Windows converts no / after exactly \\?\, so only \ separates there */
+bool isExtendedLengthPath(const Containers::StringView path) {
+    return isRunningOnWindows() && path.hasPrefix("\\\\?\\"_s);
+}
+
+bool isSeparator(const char c, const bool isExtendedLength) {
+    return c == '\\' ? isRunningOnWindows() : c == '/' && !isExtendedLength;
+}
+
+std::size_t componentSize(const Containers::StringView path, const bool isExtendedLength) {
+    std::size_t i = 0;
+    while(i != path.size() && !isSeparator(path[i], isExtendedLength))
+        ++i;
+    return i;
+}
+
+/* Returns the size of server/share at the start of path, or 0 if either name
+   is missing */
+std::size_t serverShareSize(const Containers::StringView path, const bool isExtendedLength) {
+    const std::size_t server = componentSize(path, isExtendedLength);
+    if(server == 0 || server == path.size())
+        return 0;
+    const std::size_t share = componentSize(path.exceptPrefix(server + 1), isExtendedLength);
+    return share ? server + 1 + share : 0;
+}
+
+bool hasDriveLetter(const Containers::StringView path) {
+    return path.size() >= 2 && (path[0] | 0x20) >= 'a' && (path[0] | 0x20) <= 'z' && path[1] == ':';
+}
+
+/* Returns the size of the root and the separators after it. On Windows it
+   can be a drive letter, a UNC share or a device path. */
+std::size_t rootSize(const Containers::StringView path, const bool isExtendedLength) {
+    std::size_t size = 0;
+    if(isRunningOnWindows()) {
+        if(path.size() >= 4 && isSeparator(path[0], isExtendedLength) && isSeparator(path[1], isExtendedLength) && (path[2] == '?' || path[2] == '.') && isSeparator(path[3], isExtendedLength)) {
+            const Containers::StringView device = path.exceptPrefix(4);
+            if(device.size() >= 4 && (device[0] | 0x20) == 'u' && (device[1] | 0x20) == 'n' && (device[2] | 0x20) == 'c' && isSeparator(device[3], isExtendedLength)) {
+                const std::size_t serverShare = serverShareSize(device.exceptPrefix(4), isExtendedLength);
+                size = 4 + (serverShare ? 4 + serverShare : 0);
+            } else
+                size = 4 + componentSize(device, isExtendedLength);
+        } else if(path.size() >= 2 && isSeparator(path[0], isExtendedLength) && isSeparator(path[1], isExtendedLength))
+            size = 2 + serverShareSize(path.exceptPrefix(2), isExtendedLength);
+        else if(hasDriveLetter(path))
+            size = 2;
+    }
+    while(size != path.size() && isSeparator(path[size], isExtendedLength))
+        ++size;
+    return size;
+}
+
+}
+
+Containers::Pair<Containers::StringView, Containers::StringView> split(const Containers::StringView path) {
+    const bool isExtendedLength = isExtendedLengthPath(path);
+    const std::size_t root = rootSize(path, isExtendedLength);
+
+    /* Strip the trailing separators from head unless they're the root's */
+    std::size_t tailBegin = path.size();
+    while(tailBegin > root && !isSeparator(path[tailBegin - 1], isExtendedLength))
+        --tailBegin;
+    std::size_t headEnd = tailBegin;
+    while(headEnd > root && isSeparator(path[headEnd - 1], isExtendedLength))
+        --headEnd;
+    return {path.prefix(headEnd), path.exceptPrefix(tailBegin)};
 }
 
 Containers::StringView path(const Containers::StringView filename) {
@@ -215,9 +289,7 @@ Containers::StringView filename(const Containers::StringView path) {
 }
 
 Containers::Pair<Containers::StringView, Containers::StringView> splitExtension(const Containers::StringView path) {
-    /* Take the suffix after the last slash as the filename, or the whole path
-       if it's not there */
-    const Containers::StringView filename = path.suffix(path.findLast('/').end());
+    const Containers::StringView filename = split(path).second();
 
     /* Find the last dot in the filename, or everything until the end if it's
        not there */
@@ -375,9 +447,18 @@ bool make(const Containers::StringView path) {
     if(!path)
         return true;
 
-    /* If the path contains trailing slash, strip it */
-    if(path.hasSuffix('/'))
-        return make(path.exceptSuffix(1));
+    /* Strip trailing separators unless they're the root's */
+    const bool isExtendedLength = isExtendedLengthPath(path);
+    const std::size_t root = rootSize(path, isExtendedLength);
+    std::size_t size = path.size();
+    while(size > root && isSeparator(path[size - 1], isExtendedLength))
+        --size;
+    if(size != path.size())
+        return make(path.prefix(size));
+
+    /* CreateDirectoryW() fails on an existing root with ERROR_ACCESS_DENIED */
+    if(size == root && exists(path))
+        return true;
 
     /* If parent directory doesn't exist, create it. That means two syscalls to
        create each parent (and two null-terminated string allocations on Unix /
@@ -394,7 +475,7 @@ bool make(const Containers::StringView path) {
        anything. With exists() the error message is slightly shittier if the
        parentPath is a file, but at least it doesn't fail. See the other use of
        isDirectory() below for more details. */
-    if(parentPath && parentPath != "/"_s && !exists(parentPath) && !make(parentPath))
+    if(parentPath.size() > root && !exists(parentPath) && !make(parentPath))
         return false;
 
     /* Create the leaf directory, return true if successfully created */

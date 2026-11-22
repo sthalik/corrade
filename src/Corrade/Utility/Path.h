@@ -113,10 +113,12 @@ CORRADE_UTILITY_EXPORT Containers::StringView toNativeSeparators(Containers::Str
 @m_since_latest
 
 Returns a pair of @cpp {head, tail} @ce where `head` is everything before the
-last slash and `tail` is everything after. The `head` will never have a
-trailing slash except if it's the root (one or two slashes). In all cases,
-calling @ref join() on the result will give back the original argument.
-Equivalent to Python @m_class{m-doc-external} [os.path.split()](https://docs.python.org/3/library/os.path.html#os.path.split).
+last directory separator and `tail` is everything after. The `head` has
+trailing separators only if they're a part of the root. Calling @ref join() on
+the result gives a path to the same location as the original argument, except
+for a drive-relative path such as @cpp "C:file" @ce on Windows, which it gives
+back as @cpp "C:/file" @ce. Equivalent to Python
+@m_class{m-doc-external} [os.path.split()](https://docs.python.org/3/library/os.path.html#os.path.split).
 For example:
 
 -   @cpp "path/to/file" @ce results in @cpp {"path/to", "file"} @ce
@@ -124,9 +126,15 @@ For example:
 -   @cpp "/home/user/ @ce results in @cpp {"/home/user", ""} @ce
 -   @cpp "/root" @ce results in @cpp {"/", "root"} @ce
 -   @cpp "//" @ce results in @cpp {"//", ""} @ce
+-   @cpp "C:/file" @ce results in @cpp {"C:/", "file"} @ce on Windows
 
-The implementation expects forward slashes as directory separators. Use
-@ref fromNativeSeparators() to convert from a platform-specific format.
+The root is one or more leading slashes. On Windows and on
+@ref CORRADE_TARGET_EMSCRIPTEN "Emscripten" if running under Node.js on
+Windows it can also be a drive letter, a UNC share such as
+@cpp "//server/share/" @ce or a device path such as @cpp "//./pipe/" @ce, and
+backslashes separate directories as well. In a path starting with exactly
+@cpp "\\\\?\\" @ce Windows converts no slashes, so only backslashes separate
+directories there.
 @ref Containers::StringViewFlags of the input are propagated the same way as
 with @ref Containers::StringView::slice(). If you need just one side of the
 output, use @ref path() or @ref filename().
@@ -169,8 +177,7 @@ For example:
 -   @cpp "file" @ce results in @cpp {"file", ""} @ce
 -   @cpp "/home/.bashrc" @ce results in @cpp {"/home/.bashrc", ""} @ce
 
-The implementation expects forward slashes as directory separators. Use
-@ref fromNativeSeparators() to convert from a platform-specific format.
+The filename is the `tail` returned by @ref split().
 @ref Containers::StringViewFlags of the input are propagated the same way as
 with @ref Containers::StringView::slice().
 @see @ref split(), @ref Containers::StringView::partition()

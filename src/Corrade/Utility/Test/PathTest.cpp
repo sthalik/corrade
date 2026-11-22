@@ -71,8 +71,10 @@ struct PathTest: TestSuite::Tester {
 
     /* Tests also path() and filename() */
     void split();
+    void splitWindows();
     void splitFlags();
     void splitExtension();
+    void splitExtensionWindows();
     void splitExtensionFlags();
 
     void join();
@@ -292,6 +294,98 @@ const struct {
         {"//", "computer"}},
     {"double root slash alone doesn't get dropped either", "//",
         {"//", ""}},
+    {"triple root slash", "///foo",
+        {"///", "foo"}},
+    {"network path with a trailing slash", "//computer/",
+        {"//computer", ""}},
+    {"repeated separators", "foo//bar",
+        {"foo", "bar"}},
+    {"repeated separators after the root", "/foo//bar",
+        {"/foo", "bar"}},
+    {"repeated trailing separators", "foo/bar///",
+        {"foo/bar", ""}},
+};
+
+const struct {
+    const char* name;
+    const char* path;
+    Containers::Pair<Containers::StringView, Containers::StringView> expected;
+    Containers::Pair<Containers::StringView, Containers::StringView> expectedNonWindows;
+} SplitWindowsData[]{
+    /* Python's ntpath.split() differs for \\?\ paths, where Windows converts
+       no slash, and for \\?\UNC\ and \\.\UNC\ */
+    {"drive letter", "C:/foo",
+        {"C:/", "foo"}, {"C:", "foo"}},
+    {"lowercase drive letter", "c:/foo",
+        {"c:/", "foo"}, {"c:", "foo"}},
+    {"drive letter alone with a slash", "C:/",
+        {"C:/", ""}, {"C:", ""}},
+    {"drive letter alone with a backslash", "C:\\",
+        {"C:\\", ""}, {"", "C:\\"}},
+    {"drive letter and backslashes", "C:\\foo\\bar",
+        {"C:\\foo", "bar"}, {"", "C:\\foo\\bar"}},
+    {"drive letter and mixed separators", "C:/foo\\bar",
+        {"C:/foo", "bar"}, {"C:", "foo\\bar"}},
+    {"drive-relative path", "C:foo",
+        {"C:", "foo"}, {"", "C:foo"}},
+    {"drive letter alone", "C:",
+        {"C:", ""}, {"", "C:"}},
+    {"relative path with a backslash", "foo\\bar",
+        {"foo", "bar"}, {"", "foo\\bar"}},
+    {"absolute path with a backslash", "\\foo",
+        {"\\", "foo"}, {"", "\\foo"}},
+    {"UNC share", "//server/share",
+        {"//server/share", ""}, {"//server", "share"}},
+    {"UNC share with a trailing slash", "//server/share/",
+        {"//server/share/", ""}, {"//server/share", ""}},
+    {"UNC path", "//server/share/dir",
+        {"//server/share/", "dir"}, {"//server/share", "dir"}},
+    {"UNC path with backslashes", "\\\\server\\share\\dir\\x.exe",
+        {"\\\\server\\share\\dir", "x.exe"}, {"", "\\\\server\\share\\dir\\x.exe"}},
+    {"UNC path with repeated separators", "//server/share//dir//x.exe",
+        {"//server/share//dir", "x.exe"}, {"//server/share//dir", "x.exe"}},
+    {"extended-length path", "\\\\?\\C:\\foo\\bin",
+        {"\\\\?\\C:\\foo", "bin"}, {"", "\\\\?\\C:\\foo\\bin"}},
+    {"extended-length drive root", "\\\\?\\C:\\bin",
+        {"\\\\?\\C:\\", "bin"}, {"", "\\\\?\\C:\\bin"}},
+    {"extended-length drive root alone", "\\\\?\\C:\\",
+        {"\\\\?\\C:\\", ""}, {"", "\\\\?\\C:\\"}},
+    {"extended-length drive alone", "\\\\?\\C:",
+        {"\\\\?\\C:", ""}, {"", "\\\\?\\C:"}},
+    {"slashes in an extended-length path don't separate", "\\\\?\\C:/foo/bin",
+        {"\\\\?\\C:/foo/bin", ""}, {"\\\\?\\C:/foo", "bin"}},
+    {"slash after the root of an extended-length path", "\\\\?\\C:\\foo/bin",
+        {"\\\\?\\C:\\", "foo/bin"}, {"\\\\?\\C:\\foo", "bin"}},
+    {"extended-length UNC path", "\\\\?\\UNC\\server\\share\\dir",
+        {"\\\\?\\UNC\\server\\share\\", "dir"}, {"", "\\\\?\\UNC\\server\\share\\dir"}},
+    {"extended-length UNC share", "\\\\?\\UNC\\server\\share",
+        {"\\\\?\\UNC\\server\\share", ""}, {"", "\\\\?\\UNC\\server\\share"}},
+    {"extended-length UNC share, lowercase", "\\\\?\\unc\\server\\share\\",
+        {"\\\\?\\unc\\server\\share\\", ""}, {"", "\\\\?\\unc\\server\\share\\"}},
+    {"slashes in an extended-length UNC path don't separate", "\\\\?\\UNC/server/share",
+        {"\\\\?\\UNC/server/share", ""}, {"\\\\?\\UNC/server", "share"}},
+    {"device path starting with //?/", "//?/C:/foo/bin",
+        {"//?/C:/foo", "bin"}, {"//?/C:/foo", "bin"}},
+    {"device drive root starting with //?/", "//?/C:/bin",
+        {"//?/C:/", "bin"}, {"//?/C:", "bin"}},
+    {"device drive starting with //?/ alone", "//?/C:",
+        {"//?/C:", ""}, {"//?", "C:"}},
+    {"device path prefix alone", "//?/",
+        {"//?/", ""}, {"//?", ""}},
+    {"device name alone", "//?/foo",
+        {"//?/foo", ""}, {"//?", "foo"}},
+    {"device UNC path starting with //?/", "//?/UNC/server/share/dir/x.exe",
+        {"//?/UNC/server/share/dir", "x.exe"}, {"//?/UNC/server/share/dir", "x.exe"}},
+    {"device path starting with \\\\.\\", "\\\\.\\C:\\foo\\bin",
+        {"\\\\.\\C:\\foo", "bin"}, {"", "\\\\.\\C:\\foo\\bin"}},
+    {"device path prefix \\\\.\\ alone", "\\\\.\\",
+        {"\\\\.\\", ""}, {"", "\\\\.\\"}},
+    {"device drive root starting with //./", "//./C:/bin",
+        {"//./C:/", "bin"}, {"//./C:", "bin"}},
+    {"named pipe", "//./pipe/name",
+        {"//./pipe/", "name"}, {"//./pipe", "name"}},
+    {"device UNC share starting with //./", "//./UNC/server/share",
+        {"//./UNC/server/share", ""}, {"//./UNC/server", "share"}},
 };
 
 const struct {
@@ -476,10 +570,14 @@ PathTest::PathTest() {
     addInstancedTests({&PathTest::split},
         Containers::arraySize(SplitData));
 
+    addInstancedTests({&PathTest::splitWindows},
+        Containers::arraySize(SplitWindowsData));
+
     addInstancedTests({&PathTest::splitFlags},
         Containers::arraySize(SplitFlagsData));
 
     addTests({&PathTest::splitExtension,
+              &PathTest::splitExtensionWindows,
               &PathTest::splitExtensionFlags,
 
               &PathTest::join,
@@ -862,6 +960,26 @@ void PathTest::split() {
     CORRADE_COMPARE(Path::filename(data.path), data.expected.second());
 }
 
+void PathTest::splitWindows() {
+    auto&& data = SplitWindowsData[testCaseInstanceId()];
+    setTestCaseDescription(data.name);
+
+    /* Enabled also on non-Windows platforms to make sure the Windows rules
+       aren't applied by accident elsewhere */
+    #ifdef CORRADE_TARGET_EMSCRIPTEN
+    const bool isWindows = isNodeOnWindows();
+    #elif defined(CORRADE_TARGET_WINDOWS)
+    const bool isWindows = true;
+    #else
+    const bool isWindows = false;
+    #endif
+    const Containers::Pair<Containers::StringView, Containers::StringView>& expected = isWindows ? data.expected : data.expectedNonWindows;
+
+    CORRADE_COMPARE(Path::split(data.path), expected);
+    CORRADE_COMPARE(Path::path(data.path), expected.first());
+    CORRADE_COMPARE(Path::filename(data.path), expected.second());
+}
+
 void PathTest::splitFlags() {
     auto&& data = SplitFlagsData[testCaseInstanceId()];
     setTestCaseDescription(data.name);
@@ -931,6 +1049,26 @@ void PathTest::splitExtension() {
         Containers::pair("... And Justice For All"_s, ".mp3"_s));
     CORRADE_COMPARE(Path::splitExtension("... And Justice For All"),
         Containers::pair("... And Justice For All"_s, ""_s));
+}
+
+void PathTest::splitExtensionWindows() {
+    #ifdef CORRADE_TARGET_EMSCRIPTEN
+    const bool isWindows = isNodeOnWindows();
+    #elif defined(CORRADE_TARGET_WINDOWS)
+    const bool isWindows = true;
+    #else
+    const bool isWindows = false;
+    #endif
+
+    /* Dot in a directory name before a backslash */
+    CORRADE_COMPARE(Path::splitExtension("C:\\rc.d\\file"), isWindows ?
+        Containers::pair("C:\\rc.d\\file"_s, ""_s) :
+        Containers::pair("C:\\rc"_s, ".d\\file"_s));
+
+    /* Dotfile after a drive letter */
+    CORRADE_COMPARE(Path::splitExtension("C:.bashrc"), isWindows ?
+        Containers::pair("C:.bashrc"_s, ""_s) :
+        Containers::pair("C:"_s, ".bashrc"_s));
 }
 
 void PathTest::splitExtensionFlags() {
@@ -1236,8 +1374,29 @@ void PathTest::make() {
     if(Path::exists(Path::join(_writeTestDir, "path")))
         CORRADE_VERIFY(Path::remove(Path::join(_writeTestDir, "path")));
 
-    CORRADE_VERIFY(Path::make(leaf));
-    CORRADE_VERIFY(Path::exists(leaf));
+    CORRADE_VERIFY(Path::make(path));
+    CORRADE_VERIFY(Path::exists(path));
+
+    /* Path with backslashes */
+    #ifdef CORRADE_TARGET_WINDOWS
+    Containers::String backslashPath = Path::join(_writeTestDir, "backslash\\to\\dir");
+    if(Path::exists(backslashPath))
+        CORRADE_VERIFY(Path::remove(backslashPath));
+    if(Path::exists(Path::join(_writeTestDir, "backslash\\to")))
+        CORRADE_VERIFY(Path::remove(Path::join(_writeTestDir, "backslash\\to")));
+    if(Path::exists(Path::join(_writeTestDir, "backslash")))
+        CORRADE_VERIFY(Path::remove(Path::join(_writeTestDir, "backslash")));
+
+    CORRADE_VERIFY(Path::make(backslashPath));
+    CORRADE_VERIFY(Path::exists(backslashPath));
+    #endif
+
+    /* Root, which exists already */
+    Containers::StringView root = _writeTestDir;
+    while(Path::path(root) != root)
+        root = Path::path(root);
+    CORRADE_INFO("Root found as:" << root);
+    CORRADE_VERIFY(Path::make(root));
 
     /* Empty should be just a no-op without checking anything. Not like
        in Python, where `os.makedirs('', exist_ok=True)` stupidly fails with
