@@ -1221,8 +1221,9 @@ Containers::Optional<std::int64_t> lastModification(const Containers::StringView
     struct stat result;
     if(stat(Containers::String::nullTerminatedView(filename).data(), &result) != 0)
     #elif (defined(CORRADE_TARGET_WINDOWS) && !defined(CORRADE_TARGET_WINDOWS_RT))
-    struct _stat result;
-    if(_wstat(Unicode::widen(filename).data(), &result) != 0)
+    /* _wstat() fails with EOVERFLOW on a file of 2 GB or more */
+    struct _stat64 result;
+    if(_wstat64(Unicode::widen(filename).data(), &result) != 0)
     #else
     #error
     #endif
