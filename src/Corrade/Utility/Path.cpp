@@ -834,13 +834,21 @@ Containers::Optional<Containers::String> currentDirectory() {
 
     /* Windows (not RT) */
     #elif defined(CORRADE_TARGET_WINDOWS) && !defined(CORRADE_TARGET_WINDOWS_RT)
-    /* Querying without a buffer returns size with the null terminator ... */
-    const std::size_t sizePlusOne = GetCurrentDirectoryW(0, nullptr);
-    CORRADE_INTERNAL_ASSERT(sizePlusOne);
-    Containers::Array<wchar_t> path{NoInit, sizePlusOne};
-    /* ... but retrieving the data returns size without it */
-    CORRADE_INTERNAL_ASSERT_OUTPUT(GetCurrentDirectoryW(sizePlusOne, path.data()) == sizePlusOne - 1);
-    return fromNativeSeparators(Unicode::narrow(path.exceptSuffix(1)));
+    /* A size query first would race with another thread changing the
+       directory, so there's room for the longest path Windows has */
+    constexpr DWORD capacity = 32768;
+    Containers::Array<wchar_t> path{NoInit, capacity};
+    /* Returns size *without* the null terminator, or the size needed *with*
+       it if the path doesn't fit */
+    const DWORD size = GetCurrentDirectoryW(capacity, path.data());
+    if(!size || size >= capacity) {
+        const DWORD error = GetLastError();
+        Error err;
+        err << "Utility::Path::currentDirectory():";
+        Utility::Implementation::printWindowsErrorString(err, error);
+        return {};
+    }
+    return fromNativeSeparators(Unicode::narrow(path.prefix(size)));
 
     /* Use the root path on Emscripten */
     #elif defined(CORRADE_TARGET_EMSCRIPTEN)
