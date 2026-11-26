@@ -1818,7 +1818,12 @@ template<template<class> class Allocator, class T> inline void arrayShrink(Array
 namespace Implementation {
 
 /* Used to avoid calling getter functions to speed up debug builds */
-template<class T> struct ArrayGuts {
+template<class T> struct
+#ifdef CORRADE_TARGET_GCC
+/* Without it, GCC assumes accesses through ArrayGuts and Array don't overlap */
+__attribute__((__may_alias__))
+#endif
+ArrayGuts {
     T* data;
     std::size_t size;
     void(*deleter)(T*, std::size_t);
